@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>VolumeKeyRouter</RootNamespace>
+    <AssemblyName>volume-key-router</AssemblyName>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <AssemblyTitle>Volume Key Router</AssemblyTitle>
+    <Product>Volume Key Router</Product>
+    <FileDescription>Volume Key Router</FileDescription>
+    <Version>0.1.0</Version>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryType>git</RepositoryType>
+    <NeutralLanguage>pt-BR</NeutralLanguage>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="NAudio" Version="2.3.0" />
+    <Content Include="app.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="ico.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <EmbeddedResource Include="ico.png" LogicalName="ico.png" />
+  </ItemGroup>
+</Project>
