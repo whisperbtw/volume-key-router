@@ -44,16 +44,12 @@ internal sealed class AppSettings
     {
         try
         {
-            var path = File.Exists(SettingsPath)
-                ? SettingsPath
-                : LegacySettingsPath;
-
-            if (!File.Exists(path))
+            if (!File.Exists(SettingsPath))
             {
                 return new AppSettings();
             }
 
-            var settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path), JsonOptions)
+            var settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(SettingsPath), JsonOptions)
                 ?? new AppSettings();
             settings.StepPercent = Math.Clamp(settings.StepPercent, 1, 50);
             return settings;
@@ -78,11 +74,6 @@ internal sealed class AppSettings
     private static string SettingsPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "volume-key-router",
-        "settings.json");
-
-    private static string LegacySettingsPath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "spotify-audio-keys",
         "settings.json");
 }
 
@@ -164,7 +155,6 @@ internal static class AppIconLoader
 internal static class StartupManager
 {
     private const string AppName = "VolumeKeyRouter";
-    private static readonly string[] LegacyAppNames = ["VolumeKeyRouter"];
     private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
 
     public static bool IsEnabled()
@@ -176,7 +166,7 @@ internal static class StartupManager
             return true;
         }
 
-        return LegacyAppNames.Any(name => key?.GetValue(name) is string);
+        return false;
     }
 
     public static void SetEnabled(bool enabled, bool startMinimized = false)
@@ -186,22 +176,12 @@ internal static class StartupManager
 
         if (enabled)
         {
-            RemoveLegacyValues(key);
             var arguments = startMinimized ? "--ui --start-minimized" : "--ui";
             key.SetValue(AppName, $"\"{GetExecutablePath()}\" {arguments}", RegistryValueKind.String);
         }
         else
         {
             key.DeleteValue(AppName, throwOnMissingValue: false);
-            RemoveLegacyValues(key);
-        }
-    }
-
-    private static void RemoveLegacyValues(RegistryKey key)
-    {
-        foreach (var legacyName in LegacyAppNames)
-        {
-            key.DeleteValue(legacyName, throwOnMissingValue: false);
         }
     }
 
