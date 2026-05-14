@@ -1,54 +1,46 @@
 # Volume Key Router
 
-Controle as teclas de volume do Windows para mudar o volume de um app ou de
-uma saida especifica, em vez de mexer no volume geral do sistema.
+O **Volume Key Router** é um utilitário para Windows que intercepta as teclas de
+volume do teclado e redireciona o ajuste para um alvo específico: um aplicativo
+ou uma saída de áudio.
 
-Projeto open source, feito em vibe coding. O codigo, a interface, este README e
-os textos do projeto tambem fazem parte desse processo.
+Em vez de diminuir o volume do sistema inteiro, você pode diminuir só o Spotify,
+só o navegador, ou só uma linha como o `Voicemeeter AUX Input`.
 
-## O que ele faz
+Este projeto é open source e foi feito em **vibe coding**. Isso inclui o código,
+a interface, este README e os textos do projeto.
+
+## Funcionalidades
 
 - Intercepta `Volume Up` e `Volume Down` do teclado.
-- Funciona com `Fn+F2/F3` quando o notebook envia essas teclas como volume.
-- Controla o volume de um app/processo especifico.
-- Controla o volume de uma saida inteira, como `Voicemeeter AUX Input`.
-- Permite escolher o alvo por interface grafica.
-- Salva a ultima escolha e restaura quando abrir de novo.
-- Se o ultimo app/linha ainda nao existir, procura em segundo plano sem ficar
-  piscando ou atualizando a lista toda hora.
-- Fica no tray, com menu para abrir, ativar/pausar captura, atualizar e sair.
-- Tem opcao de iniciar com o Windows.
-- Tem opcao de iniciar minimizado com o Windows.
-- Evita abrir duas instancias: se ja estiver rodando, abre a janela existente.
-- Mostra overlay de volume proprio quando o volume muda.
-- Nao usa API do Spotify.
+- Funciona com `Fn+F2/F3`, quando o notebook envia essas teclas como volume.
+- Controla o volume de um aplicativo/processo específico.
+- Controla o volume de uma saída inteira, como `Voicemeeter AUX Input`.
+- Permite escolher o alvo pela interface gráfica.
+- Salva a última escolha e tenta restaurá-la ao abrir novamente.
+- Se o último app ou dispositivo ainda não estiver disponível, procura em
+  segundo plano sem ficar piscando a interface.
+- Fica no tray, com opções para abrir, ativar/pausar captura, atualizar e sair.
+- Pode iniciar junto com o Windows.
+- Pode iniciar minimizado no tray quando for aberto pelo Windows.
+- Impede duas instâncias abertas ao mesmo tempo.
+- Mostra um overlay próprio quando o volume muda.
+- Não usa a API do Spotify.
 
-## Para quem serve
+## Download
 
-Serve para casos como:
-
-- baixar/aumentar so o Spotify;
-- controlar so o navegador tocando musica;
-- controlar so uma linha do Voicemeeter;
-- deixar as teclas de volume afetando um alvo fixo enquanto o resto do sistema
-  fica no mesmo volume.
-
-## Como baixar
-
-Baixe o `.exe` na aba **Releases** do GitHub.
-
-Arquivo principal:
+Baixe a versão mais recente na aba **Releases**:
 
 ```text
 volume-key-router.exe
 ```
 
-O executavel publicado e self-contained, ou seja, ja leva o runtime .NET junto.
-Nao precisa instalar .NET no computador para usar a versao da release.
+O executável da release é **self-contained**, então já inclui o runtime .NET.
+Você não precisa instalar o .NET para usar essa versão.
 
-Se o Windows bloquear por ter vindo da internet:
+Se o Windows bloquear o arquivo por ele ter vindo da internet:
 
-1. Clique com o botao direito no `.exe`.
+1. Clique com o botão direito no `.exe`.
 2. Abra **Propriedades**.
 3. Marque **Desbloquear**.
 4. Clique em **OK**.
@@ -56,42 +48,44 @@ Se o Windows bloquear por ter vindo da internet:
 ## Como usar
 
 1. Abra `volume-key-router.exe`.
-2. Escolha o dispositivo de saida.
-3. Escolha o modo:
-   - `App selecionado`: controla so o app selecionado na lista.
-   - `Linha/dispositivo selecionado`: controla a saida inteira.
+2. Escolha o dispositivo de saída.
+3. Escolha um modo:
+   - `App selecionado`: controla apenas o app selecionado na lista.
+   - `Linha/dispositivo selecionado`: controla a saída de áudio inteira.
 4. Clique em `Ativar captura`.
 5. Use as teclas de volume do teclado.
 
-## Voicemeeter AUX
+## Exemplo: Voicemeeter AUX
 
-Para controlar a linha auxiliar do Voicemeeter:
+Para controlar só a linha auxiliar do Voicemeeter:
 
-1. Em `Dispositivo de saida`, escolha `Voicemeeter AUX Input`.
+1. Em `Dispositivo de saída`, escolha `Voicemeeter AUX Input`.
 2. Marque `Linha/dispositivo selecionado`.
-3. Use as teclas de volume.
+3. Use as teclas de volume normalmente.
 
-## Inicializacao com Windows
+## Inicialização com Windows
 
-- `Iniciar com Windows`: coloca o app na inicializacao do usuario atual.
-- `Iniciar minimizado com Windows`: quando o Windows abrir o app sozinho, ele
-  nasce direto no tray.
-- Abrir manualmente pelo `.exe` sempre mostra a janela normal.
+- `Iniciar com Windows`: adiciona o app à inicialização do usuário atual.
+- `Iniciar minimizado com Windows`: quando o Windows abrir o app, ele já nasce
+  direto no tray.
+- Se você abrir o `.exe` manualmente, a janela aparece normalmente.
 
-## Onde ficam as configuracoes
+## Configurações
+
+As configurações ficam em:
 
 ```text
 %AppData%\volume-key-router\settings.json
 ```
 
-## Como compilar
+## Desenvolvimento
 
 Requisitos:
 
 - Windows 10/11
 - .NET SDK 10
 
-Build:
+Compilar:
 
 ```powershell
 dotnet build .\VolumeKeyRouter.csproj -c Release
@@ -103,33 +97,33 @@ Rodar pelo SDK:
 dotnet run --project .\VolumeKeyRouter.csproj -c Release
 ```
 
-Gerar o `.exe` self-contained:
+Gerar o executável self-contained:
 
 ```powershell
 .\publish-win-x64.ps1
 ```
 
-Saida:
+Saída:
 
 ```text
 publish\win-x64\volume-key-router.exe
 ```
 
-## Estrutura do projeto
+## Estrutura
 
 ```text
-App\        entrada, CLI e configuracoes
-Audio\      integracao com audio do Windows via NAudio
+App\        entrada, CLI e configurações
+Audio\      integração com áudio do Windows via NAudio
 Core\       modelos compartilhados
 Interop\    chamadas nativas do Windows
 Keyboard\   hook global das teclas de volume
-UI\         WinForms, tray, tema e restauracao do alvo salvo
+UI\         WinForms, tray, tema e restauração do alvo salvo
 ```
 
 ## CLI opcional
 
-A interface grafica e o uso principal, mas existe uma CLI simples para
-diagnostico:
+A interface gráfica é o uso principal, mas existe uma CLI simples para
+diagnóstico:
 
 ```powershell
 .\publish\win-x64\volume-key-router.exe --cli --devices
@@ -137,16 +131,16 @@ diagnostico:
 .\publish\win-x64\volume-key-router.exe --cli --process Spotify --step 3
 ```
 
-## Observacoes
+## Observações
 
-- A tecla `Fn` em si normalmente nao chega ao Windows. O app captura o evento
-  de volume que o driver/firmware gera.
-- Um app so aparece na lista quando o Windows cria uma sessao de audio para ele.
-- Se usar Spotify Web, o processo pode ser `chrome`, `msedge` ou `firefox`, nao
-  `Spotify`.
-- Se um app roda como administrador e o hook nao pega as teclas nesse contexto,
-  rode o Volume Key Router como administrador tambem.
+- A tecla `Fn` normalmente não chega ao Windows. O app captura o evento de
+  volume gerado pelo driver ou firmware do teclado.
+- Um app só aparece na lista quando o Windows cria uma sessão de áudio para ele.
+- Se você usa Spotify Web, o processo pode aparecer como `chrome`, `msedge` ou
+  `firefox`, não como `Spotify`.
+- Se um app roda como administrador e o hook não pega as teclas nesse contexto,
+  rode o Volume Key Router como administrador também.
 
-## Licenca
+## Licença
 
 MIT. Pode usar, modificar e distribuir.
