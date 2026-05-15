@@ -42,7 +42,8 @@ internal readonly record struct SessionTarget(
 internal enum VolumeCommand
 {
     Down,
-    Up
+    Up,
+    Mute
 }
 
 internal sealed record AudioDeviceInfo(string Id, string Name, bool IsDefault)
@@ -88,7 +89,9 @@ internal readonly record struct VolumeAdjustmentResult(
     int ChangedSessions,
     float Before,
     float After,
-    string TargetLabel)
+    string TargetLabel,
+    bool IsMuteCommand = false,
+    bool IsMuted = false)
 {
     public static VolumeAdjustmentResult NotFound => new(0, 0, 0, string.Empty);
 }

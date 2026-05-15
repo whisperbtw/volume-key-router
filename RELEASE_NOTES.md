@@ -1,24 +1,24 @@
-# Volume Key Router v0.1.0
-
-Primeira release publica do Volume Key Router.
-
-Projeto open source feito em vibe coding, incluindo codigo, interface e textos.
+# Volume Key Router v0.1.1
 
 ## Destaques
 
-- Interface WinForms em dark mode.
-- Captura global de `Volume Up` e `Volume Down`.
-- Controle de volume por app/processo.
-- Controle de volume por saida de audio, incluindo Voicemeeter AUX.
-- Tray com abrir, ativar/pausar captura, atualizar e sair.
-- Inicializacao com Windows.
-- Opcao de iniciar minimizado apenas quando aberto pelo Windows.
-- Salvamento da ultima escolha.
-- Busca silenciosa do ultimo app/linha salvo, sem ficar piscando a interface.
-- Executavel self-contained para Windows x64.
+- Interface migrada para WPF.
+- Novo instalador Inno Setup (`VolumeKeyRouterSetup-0.1.1.exe`).
+- Instalador atualiza por cima da versao anterior usando o mesmo `AppId`.
+- Instalador fecha o app aberto de forma graciosa antes de substituir arquivos.
+- Configuracoes continuam em `%AppData%\volume-key-router\settings.json`.
+- Mute (`Fn+F4` / `Volume Mute`) agora afeta apenas o app ou linha selecionada.
+- Overlay de volume refeito em WPF e ajustado para DPI.
+- Salvamento de configuracoes corrigido para nao sobrescrever preferencias ao abrir.
 
-## Arquivo da release
+## Arquivo da Release
 
 ```text
-volume-key-router.exe
+VolumeKeyRouterSetup-0.1.1.exe
 ```
+
+## Notas
+
+- O app agora depende de arquivos nativos WPF na pasta instalada. Por isso, a
+  distribuicao recomendada e o instalador, nao apenas o `volume-key-router.exe`.
+- O instalador nao usa assinatura/certificacao.

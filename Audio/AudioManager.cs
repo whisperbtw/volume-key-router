@@ -126,8 +126,18 @@ internal sealed class AudioManager : IDisposable
                 }
 
                 var currentVolume = session.SimpleAudioVolume.Volume;
-                var nextVolume = CalculateNextVolume(currentVolume, step, minimum, maximum, command);
-                session.SimpleAudioVolume.Volume = nextVolume;
+                var nextVolume = currentVolume;
+                var isMuted = false;
+                if (command == VolumeCommand.Mute)
+                {
+                    isMuted = !session.SimpleAudioVolume.Mute;
+                    session.SimpleAudioVolume.Mute = isMuted;
+                }
+                else
+                {
+                    nextVolume = CalculateNextVolume(currentVolume, step, minimum, maximum, command);
+                    session.SimpleAudioVolume.Volume = nextVolume;
+                }
 
                 changed++;
                 beforeTotal += currentVolume;
@@ -141,7 +151,9 @@ internal sealed class AudioManager : IDisposable
                     changed,
                     beforeTotal / changed,
                     afterTotal / changed,
-                    string.Join(", ", labels));
+                    string.Join(", ", labels),
+                    command == VolumeCommand.Mute,
+                    command == VolumeCommand.Mute && afterTotal >= 0 && IsTargetMuted(deviceId, target));
         }
     }
 
@@ -158,10 +170,26 @@ internal sealed class AudioManager : IDisposable
             var deviceName = GetReadableDeviceName(device);
             var endpointVolume = device.AudioEndpointVolume;
             var currentVolume = endpointVolume.MasterVolumeLevelScalar;
-            var nextVolume = CalculateNextVolume(currentVolume, step, minimum, maximum, command);
-            endpointVolume.MasterVolumeLevelScalar = nextVolume;
+            var nextVolume = currentVolume;
+            var isMuted = endpointVolume.Mute;
+            if (command == VolumeCommand.Mute)
+            {
+                isMuted = !isMuted;
+                endpointVolume.Mute = isMuted;
+            }
+            else
+            {
+                nextVolume = CalculateNextVolume(currentVolume, step, minimum, maximum, command);
+                endpointVolume.MasterVolumeLevelScalar = nextVolume;
+            }
 
-            return new VolumeAdjustmentResult(1, currentVolume, nextVolume, deviceName);
+            return new VolumeAdjustmentResult(
+                1,
+                currentVolume,
+                nextVolume,
+                deviceName,
+                command == VolumeCommand.Mute,
+                isMuted);
         }
     }
 
@@ -173,6 +201,25 @@ internal sealed class AudioManager : IDisposable
     private NAudio.CoreAudioApi.MMDevice OpenDevice(string deviceId)
     {
         return deviceEnumerator.GetDevice(deviceId);
+    }
+
+    private bool IsTargetMuted(string deviceId, SessionTarget target)
+    {
+        using var device = OpenDevice(deviceId);
+        var manager = device.AudioSessionManager;
+        manager.RefreshSessions();
+        var sessions = manager.Sessions;
+
+        for (var index = 0; index < sessions.Count; index++)
+        {
+            var session = sessions[index];
+            if (MatchesTarget(session, session.GetProcessID, target, out _))
+            {
+                return session.SimpleAudioVolume.Mute;
+            }
+        }
+
+        return false;
     }
 
     private static float CalculateNextVolume(float currentVolume, float step, float minimum, float maximum, VolumeCommand command)

@@ -13,6 +13,7 @@ internal sealed class VolumeKeyHook : IDisposable
 {
     private const int WhKeyboardLl = 13;
     private const int HcAction = 0;
+    private const int VkVolumeMute = 0xAD;
     private const int VkVolumeDown = 0xAE;
     private const int VkVolumeUp = 0xAF;
     private const int WmKeyDown = 0x0100;
@@ -65,11 +66,17 @@ internal sealed class VolumeKeyHook : IDisposable
             if (message is WmKeyDown or WmKeyUp or WmSysKeyDown or WmSysKeyUp)
             {
                 var key = Marshal.PtrToStructure<NativeMethods.KeyboardHookStruct>(lParam);
-                if (key.VirtualKeyCode is VkVolumeDown or VkVolumeUp)
+                if (key.VirtualKeyCode is VkVolumeMute or VkVolumeDown or VkVolumeUp)
                 {
                     if (message is WmKeyDown or WmSysKeyDown)
                     {
-                        var handled = onCommand(key.VirtualKeyCode == VkVolumeDown ? VolumeCommand.Down : VolumeCommand.Up);
+                        var command = key.VirtualKeyCode switch
+                        {
+                            VkVolumeMute => VolumeCommand.Mute,
+                            VkVolumeDown => VolumeCommand.Down,
+                            _ => VolumeCommand.Up
+                        };
+                        var handled = onCommand(command);
                         return handled ? 1 : NativeMethods.CallNextHookEx(hookHandle, nCode, wParam, lParam);
                     }
 

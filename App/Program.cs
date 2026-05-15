@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Text.Json;
 using System.Windows.Forms;
+using WpfApplication = System.Windows.Application;
 using Microsoft.Win32;
 
 namespace VolumeKeyRouter;
@@ -15,6 +16,7 @@ internal static class Program
     public const string AppExecutableName = "volume-key-router.exe";
     private const string SingleInstanceMutexName = @"Local\VolumeKeyRouter.SingleInstance";
     private const string SingleInstanceEventName = @"Local\VolumeKeyRouter.ActivateMainWindow";
+    private const string SingleInstanceShutdownEventName = @"Local\VolumeKeyRouter.ShutdownMainWindow";
 
     [STAThread]
     private static int Main(string[] args)
@@ -24,6 +26,12 @@ internal static class Program
             ConsoleHost.EnsureConsole();
             Console.Error.WriteLine("Este utilitario usa APIs nativas de audio/teclado do Windows.");
             return 1;
+        }
+
+        if (args.Any(arg => arg.Equals("--shutdown-existing", StringComparison.OrdinalIgnoreCase)))
+        {
+            SignalExistingInstanceShutdown();
+            return 0;
         }
 
         var startMinimized = args.Any(IsStartMinimizedArg);
@@ -44,8 +52,14 @@ internal static class Program
             }
 
             using var activationEvent = new EventWaitHandle(false, EventResetMode.AutoReset, SingleInstanceEventName);
-            ApplicationConfiguration.Initialize();
-            Application.Run(new MainForm(activationEvent, startMinimized));
+            using var shutdownEvent = new EventWaitHandle(false, EventResetMode.AutoReset, SingleInstanceShutdownEventName);
+            System.Windows.Forms.Application.EnableVisualStyles();
+            System.Windows.Forms.Application.SetCompatibleTextRenderingDefault(false);
+            var app = new WpfApplication
+            {
+                ShutdownMode = System.Windows.ShutdownMode.OnMainWindowClose
+            };
+            app.Run(new MainWindow(activationEvent, shutdownEvent, startMinimized));
             return 0;
         }
 
@@ -80,6 +94,23 @@ internal static class Program
             NativeMethods.WmShowExistingApp,
             IntPtr.Zero,
             IntPtr.Zero);
+    }
+
+    private static void SignalExistingInstanceShutdown()
+    {
+        try
+        {
+            using var shutdownEvent = EventWaitHandle.OpenExisting(SingleInstanceShutdownEventName);
+            shutdownEvent.Set();
+        }
+        catch (WaitHandleCannotBeOpenedException)
+        {
+            // Builds before the WPF migration do not expose the shutdown event.
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // The publish script still has process-level fallbacks for older builds.
+        }
     }
 
     private static int RunCli(string[] args)
@@ -182,8 +213,17 @@ internal static class Program
 
                     if (result.ChangedSessions > 0)
                     {
-                        Console.WriteLine(
-                            $"{DateTime.Now:HH:mm:ss} {result.TargetLabel}: {result.Before:P0} -> {result.After:P0} ({result.ChangedSessions} sessao/s)");
+                        if (result.IsMuteCommand)
+                        {
+                            Console.WriteLine(
+                                $"{DateTime.Now:HH:mm:ss} {result.TargetLabel}: {(result.IsMuted ? "mutado" : "desmutado")} ({result.ChangedSessions} sessao/s)");
+                        }
+                        else
+                        {
+                            Console.WriteLine(
+                                $"{DateTime.Now:HH:mm:ss} {result.TargetLabel}: {result.Before:P0} -> {result.After:P0} ({result.ChangedSessions} sessao/s)");
+                        }
+
                         continue;
                     }
 
