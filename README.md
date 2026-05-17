@@ -31,6 +31,8 @@ a interface, este README e os textos do projeto.
 - Mostra um overlay proprio quando o volume muda.
 - O overlay pode mostrar titulo, artista e capa da musica atual quando o player
   entrega essas informacoes ao Windows.
+- O overlay tambem aparece quando a musica muda ou quando o player pausa/volta.
+- `Fn+F1` mostra o overlay com a musica atual, sem precisar mudar o volume.
 - Mantem a ultima capa em cache durante ajustes rapidos para evitar piscadas no
   overlay.
 - Nao usa a API do Spotify; as informacoes de musica vem dos controles de midia
@@ -68,6 +70,7 @@ Se o Windows bloquear o arquivo por ele ter vindo da internet:
    - `Linha/dispositivo selecionado`: controla a saida de audio inteira.
 4. Clique em `Ativar captura`.
 5. Use as teclas de volume do teclado.
+6. Use `Fn+F1` para mostrar a musica atual no overlay.
 
 ## Exemplo: Voicemeeter AUX
 
@@ -166,6 +169,8 @@ diagnostico:
 
 - A tecla `Fn` normalmente nao chega ao Windows. O app captura o evento de
   volume gerado pelo driver ou firmware do teclado.
+- `Fn+F1` normalmente chega ao Windows como `F1`. Enquanto a captura estiver
+  ativa, o app intercepta `F1` para mostrar a musica atual no overlay.
 - Um app so aparece na lista quando o Windows cria uma sessao de audio para ele.
 - Titulo, artista e capa no overlay dependem do player publicar metadados para
   os controles de midia do Windows. Se o player nao publicar, o overlay continua

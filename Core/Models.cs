@@ -46,6 +46,14 @@ internal enum VolumeCommand
     Mute
 }
 
+internal enum MediaPlaybackState
+{
+    Unknown,
+    Playing,
+    Paused,
+    Stopped
+}
+
 internal sealed record AudioDeviceInfo(string Id, string Name, bool IsDefault)
 {
     public override string ToString()
@@ -96,9 +104,29 @@ internal readonly record struct VolumeAdjustmentResult(
     public static VolumeAdjustmentResult NotFound => new(0, 0, 0, string.Empty);
 }
 
-internal sealed record MediaTrackInfo(string Title, string? Artist, byte[]? ArtworkBytes)
+internal readonly record struct TargetVolumeState(
+    bool Found,
+    float Volume,
+    bool IsMuted,
+    string TargetLabel)
+{
+    public static TargetVolumeState NotFound => new(false, 1, false, string.Empty);
+}
+
+internal sealed record MediaTrackInfo(
+    string Title,
+    string? Artist,
+    byte[]? ArtworkBytes,
+    MediaPlaybackState PlaybackState)
 {
     public string DisplayText => string.IsNullOrWhiteSpace(Artist)
         ? Title
         : $"{Artist} - {Title}";
+
+    public string OverlayTitle => PlaybackState switch
+    {
+        MediaPlaybackState.Paused => "Pausado",
+        MediaPlaybackState.Stopped => "Parado",
+        _ => "Tocando agora"
+    };
 }

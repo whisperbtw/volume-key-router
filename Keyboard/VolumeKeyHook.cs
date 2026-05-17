@@ -13,6 +13,7 @@ internal sealed class VolumeKeyHook : IDisposable
 {
     private const int WhKeyboardLl = 13;
     private const int HcAction = 0;
+    private const int VkF1 = 0x70;
     private const int VkVolumeMute = 0xAD;
     private const int VkVolumeDown = 0xAE;
     private const int VkVolumeUp = 0xAF;
@@ -22,14 +23,19 @@ internal sealed class VolumeKeyHook : IDisposable
     private const int WmSysKeyUp = 0x0105;
 
     private readonly Func<VolumeCommand, bool> onCommand;
+    private readonly Func<bool>? onPeekMedia;
     private readonly Func<bool> shouldBlockKeys;
     private readonly NativeMethods.LowLevelKeyboardProc callback;
     private IntPtr hookHandle;
 
-    public VolumeKeyHook(Func<VolumeCommand, bool> onCommand, Func<bool> shouldBlockKeys)
+    public VolumeKeyHook(
+        Func<VolumeCommand, bool> onCommand,
+        Func<bool> shouldBlockKeys,
+        Func<bool>? onPeekMedia = null)
     {
         this.onCommand = onCommand;
         this.shouldBlockKeys = shouldBlockKeys;
+        this.onPeekMedia = onPeekMedia;
         callback = HookCallback;
     }
 
@@ -66,6 +72,17 @@ internal sealed class VolumeKeyHook : IDisposable
             if (message is WmKeyDown or WmKeyUp or WmSysKeyDown or WmSysKeyUp)
             {
                 var key = Marshal.PtrToStructure<NativeMethods.KeyboardHookStruct>(lParam);
+                if (key.VirtualKeyCode == VkF1 && onPeekMedia is not null)
+                {
+                    if (message is WmKeyDown or WmSysKeyDown)
+                    {
+                        var handled = onPeekMedia();
+                        return handled ? 1 : NativeMethods.CallNextHookEx(hookHandle, nCode, wParam, lParam);
+                    }
+
+                    return 1;
+                }
+
                 if (key.VirtualKeyCode is VkVolumeMute or VkVolumeDown or VkVolumeUp)
                 {
                     if (message is WmKeyDown or WmSysKeyDown)

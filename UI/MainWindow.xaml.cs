@@ -19,6 +19,7 @@ public sealed partial class MainWindow : Window
     private readonly EventWaitHandle? activationEvent;
     private readonly EventWaitHandle? shutdownEvent;
     private readonly CancellationTokenSource activationWatcherCancellation = new();
+    private readonly CancellationTokenSource mediaWatcherCancellation = new();
     private readonly AppSettings settings;
     private readonly AudioManager audioManager = new();
     private readonly MediaSessionInfoProvider mediaSessionInfoProvider = new();
@@ -37,6 +38,7 @@ public sealed partial class MainWindow : Window
     };
 
     private VolumeKeyHook? hook;
+    private MediaSessionChangeWatcher? mediaSessionChangeWatcher;
     private TargetSnapshot targetSnapshot = TargetSnapshot.Invalid;
     private bool captureActive;
     private bool refreshing;
@@ -50,6 +52,8 @@ public sealed partial class MainWindow : Window
     private MediaTrackInfo? cachedMediaTrack;
     private DateTime cachedMediaTrackUtc;
     private DateTime lastMediaLookupUtc;
+    private MediaOverlayFingerprint? lastMediaOverlayEvent;
+    private DateTime lastMediaOverlayEventUtc;
 
     public ObservableCollection<SessionRow> Sessions { get; } = new();
 
@@ -122,6 +126,7 @@ public sealed partial class MainWindow : Window
 
         var shouldStartCapture = settings.CaptureActive;
         StartActivationWatcher();
+        StartMediaSessionWatcher();
 
         suppressSettingsSave = true;
         try
@@ -344,7 +349,7 @@ public sealed partial class MainWindow : Window
 
         try
         {
-            hook = new VolumeKeyHook(HandleVolumeKey, HasValidTarget);
+            hook = new VolumeKeyHook(HandleVolumeKey, HasValidTarget, HandlePeekMediaKey);
             hook.Install();
             captureActive = true;
             UpdateCaptureButton();
@@ -354,7 +359,7 @@ public sealed partial class MainWindow : Window
                 SaveSettings();
             }
 
-            SetStatus("Captura ativa. Fn+F2/F3 vai controlar o alvo selecionado.");
+            SetStatus("Captura ativa. Fn+F1 mostra a midia; Fn+F2/F3 controla o alvo.");
         }
         catch (Exception ex)
         {
@@ -456,6 +461,12 @@ public sealed partial class MainWindow : Window
         return true;
     }
 
+    private bool HandlePeekMediaKey()
+    {
+        _ = ShowCurrentMediaOverlayAsync(force: true, honorOverlaySetting: false);
+        return true;
+    }
+
     private async Task UpdateOverlayMediaInfoAsync(string preferredTarget, VolumeAdjustmentResult result, long requestId)
     {
         try
@@ -486,6 +497,138 @@ public sealed partial class MainWindow : Window
         }
         catch
         {
+        }
+    }
+
+    private void StartMediaSessionWatcher()
+    {
+        if (mediaSessionChangeWatcher is not null)
+        {
+            return;
+        }
+
+        mediaSessionChangeWatcher = new MediaSessionChangeWatcher(
+            () => ShowCurrentMediaOverlayAsync(force: false, honorOverlaySetting: true));
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await mediaSessionChangeWatcher.StartAsync(mediaWatcherCancellation.Token);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch
+            {
+            }
+        });
+    }
+
+    private async Task ShowCurrentMediaOverlayAsync(bool force, bool honorOverlaySetting)
+    {
+        var requestId = Interlocked.Increment(ref overlayRequestId);
+        var snapshot = GetTargetSnapshot();
+        var mediaTrack = await GetFreshMediaTrackAsync(snapshot.DisplayName);
+        mediaTrack ??= GetCachedMediaTrack();
+
+        if (mediaTrack is null)
+        {
+            if (!force)
+            {
+                return;
+            }
+
+            ShowMediaOverlay(
+                requestId,
+                "Nada tocando",
+                null,
+                null,
+                GetCurrentTargetVolumeState(snapshot),
+                honorOverlaySetting);
+            return;
+        }
+
+        CacheMediaTrack(mediaTrack);
+        if (!force && !ShouldShowMediaOverlayEvent(mediaTrack))
+        {
+            return;
+        }
+
+        ShowMediaOverlay(
+            requestId,
+            mediaTrack.OverlayTitle,
+            mediaTrack.DisplayText,
+            mediaTrack.ArtworkBytes,
+            GetCurrentTargetVolumeState(snapshot),
+            honorOverlaySetting);
+    }
+
+    private async Task<MediaTrackInfo?> GetFreshMediaTrackAsync(string preferredTarget)
+    {
+        try
+        {
+            using var metadataTimeout = new CancellationTokenSource(TimeSpan.FromMilliseconds(900));
+            return await mediaSessionInfoProvider.GetCurrentTrackAsync(preferredTarget, metadataTimeout.Token);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private void ShowMediaOverlay(
+        long requestId,
+        string title,
+        string? detail,
+        byte[]? artworkBytes,
+        TargetVolumeState targetVolume,
+        bool honorOverlaySetting)
+    {
+        BeginInvokeSafe(() =>
+        {
+            if (requestId != Interlocked.Read(ref overlayRequestId))
+            {
+                return;
+            }
+
+            if (honorOverlaySetting && ShowOverlayBox.IsChecked != true)
+            {
+                return;
+            }
+
+            volumeOverlay.ShowVolume(
+                title,
+                targetVolume.Volume,
+                detail,
+                targetVolume.IsMuted,
+                artworkBytes);
+        });
+    }
+
+    private TargetVolumeState GetCurrentTargetVolumeState(TargetSnapshot snapshot)
+    {
+        if (!snapshot.IsValid)
+        {
+            return new TargetVolumeState(false, 1, false, "Midia");
+        }
+
+        try
+        {
+            lock (applyGate)
+            {
+                var state = snapshot.Mode == TargetMode.Device
+                    ? audioManager.GetEndpointVolumeState(snapshot.DeviceId)
+                    : audioManager.GetSessionVolumeState(snapshot.DeviceId, snapshot.SessionTarget);
+
+                return state.Found
+                    ? state
+                    : new TargetVolumeState(false, 1, false, snapshot.DisplayName);
+            }
+        }
+        catch
+        {
+            return new TargetVolumeState(false, 1, false, snapshot.DisplayName);
         }
     }
 
@@ -520,6 +663,28 @@ public sealed partial class MainWindow : Window
         {
             cachedMediaTrack = mediaTrack;
             cachedMediaTrackUtc = DateTime.UtcNow;
+        }
+    }
+
+    private bool ShouldShowMediaOverlayEvent(MediaTrackInfo mediaTrack)
+    {
+        var fingerprint = new MediaOverlayFingerprint(
+            mediaTrack.Title,
+            mediaTrack.Artist ?? string.Empty,
+            mediaTrack.PlaybackState);
+
+        lock (mediaCacheGate)
+        {
+            var now = DateTime.UtcNow;
+            if (lastMediaOverlayEvent == fingerprint &&
+                now - lastMediaOverlayEventUtc < TimeSpan.FromSeconds(2))
+            {
+                return false;
+            }
+
+            lastMediaOverlayEvent = fingerprint;
+            lastMediaOverlayEventUtc = now;
+            return true;
         }
     }
 
@@ -953,8 +1118,11 @@ public sealed partial class MainWindow : Window
         SaveSettings();
         StopCapture(persist: false);
         activationWatcherCancellation.Cancel();
+        mediaWatcherCancellation.Cancel();
+        mediaSessionChangeWatcher?.Dispose();
         activationEvent?.Set();
         activationWatcherCancellation.Dispose();
+        mediaWatcherCancellation.Dispose();
         savedTargetSearchTimer.Stop();
         trayIcon.Visible = false;
         trayIcon.Dispose();
@@ -1112,4 +1280,9 @@ public sealed partial class MainWindow : Window
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
+
+    private readonly record struct MediaOverlayFingerprint(
+        string Title,
+        string Artist,
+        MediaPlaybackState PlaybackState);
 }

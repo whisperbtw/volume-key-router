@@ -28,7 +28,11 @@ internal sealed class MediaSessionInfoProvider
                 }
 
                 var artworkBytes = await ReadArtworkBytesAsync(properties.Thumbnail, cancellationToken);
-                return new MediaTrackInfo(title, NullIfWhiteSpace(properties.Artist), artworkBytes);
+                return new MediaTrackInfo(
+                    title,
+                    NullIfWhiteSpace(properties.Artist),
+                    artworkBytes,
+                    ToPlaybackState(session.GetPlaybackInfo().PlaybackStatus));
             }
         }
         catch (OperationCanceledException)
@@ -70,6 +74,17 @@ internal sealed class MediaSessionInfoProvider
         using var reader = DataReader.FromBuffer(readBuffer);
         reader.ReadBytes(bytes);
         return bytes;
+    }
+
+    private static MediaPlaybackState ToPlaybackState(GlobalSystemMediaTransportControlsSessionPlaybackStatus status)
+    {
+        return status switch
+        {
+            GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing => MediaPlaybackState.Playing,
+            GlobalSystemMediaTransportControlsSessionPlaybackStatus.Paused => MediaPlaybackState.Paused,
+            GlobalSystemMediaTransportControlsSessionPlaybackStatus.Stopped => MediaPlaybackState.Stopped,
+            _ => MediaPlaybackState.Unknown
+        };
     }
 
     private static IEnumerable<GlobalSystemMediaTransportControlsSession> OrderSessions(

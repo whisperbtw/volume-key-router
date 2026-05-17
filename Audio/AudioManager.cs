@@ -205,6 +205,64 @@ internal sealed class AudioManager : IDisposable
         }
     }
 
+    public TargetVolumeState GetSessionVolumeState(string deviceId, SessionTarget target)
+    {
+        lock (gate)
+        {
+            var matched = 0;
+            var muted = 0;
+            var volumeTotal = 0.0f;
+            var labels = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            using var device = OpenDevice(deviceId);
+            var manager = device.AudioSessionManager;
+            manager.RefreshSessions();
+            var sessions = manager.Sessions;
+
+            for (var index = 0; index < sessions.Count; index++)
+            {
+                var session = sessions[index];
+                var processId = session.GetProcessID;
+                if (!MatchesTarget(session, processId, target, out var processLabel))
+                {
+                    continue;
+                }
+
+                var volumeControl = session.SimpleAudioVolume;
+                matched++;
+                volumeTotal += volumeControl.Volume;
+                if (volumeControl.Mute)
+                {
+                    muted++;
+                }
+
+                labels.Add(processLabel);
+            }
+
+            return matched == 0
+                ? TargetVolumeState.NotFound
+                : new TargetVolumeState(
+                    true,
+                    volumeTotal / matched,
+                    muted == matched,
+                    string.Join(", ", labels));
+        }
+    }
+
+    public TargetVolumeState GetEndpointVolumeState(string deviceId)
+    {
+        lock (gate)
+        {
+            using var device = OpenDevice(deviceId);
+            var endpointVolume = device.AudioEndpointVolume;
+            return new TargetVolumeState(
+                true,
+                endpointVolume.MasterVolumeLevelScalar,
+                endpointVolume.Mute,
+                GetReadableDeviceName(device));
+        }
+    }
+
     public void Dispose()
     {
         deviceEnumerator.Dispose();

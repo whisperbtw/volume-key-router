@@ -13,7 +13,7 @@
     <AssemblyTitle>Volume Key Router</AssemblyTitle>
     <Product>Volume Key Router</Product>
     <FileDescription>Volume Key Router</FileDescription>
-    <Version>0.1.3</Version>
+    <Version>0.1.4</Version>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryType>git</RepositoryType>
     <NeutralLanguage>pt-BR</NeutralLanguage>
