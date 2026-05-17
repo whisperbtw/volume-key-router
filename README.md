@@ -49,6 +49,8 @@ precisa instalar o .NET para usar a versao da release.
 
 Ao instalar uma versao nova por cima da antiga, o instalador fecha o app aberto
 de forma graciosa, atualiza os arquivos e preserva suas configuracoes.
+Quando uma instalacao existente e detectada, o instalador mostra as opcoes
+`Atualizar` e `Reparar` antes de continuar.
 
 Se o Windows bloquear o arquivo por ele ter vindo da internet:
 
