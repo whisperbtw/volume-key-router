@@ -7,7 +7,10 @@ internal sealed class MediaSessionInfoProvider
 {
     private const int MaxArtworkBytes = 4 * 1024 * 1024;
 
-    public async Task<MediaTrackInfo?> GetCurrentTrackAsync(string? preferredTarget, CancellationToken cancellationToken = default)
+    public async Task<MediaTrackInfo?> GetCurrentTrackAsync(
+        string? preferredTarget,
+        CancellationToken cancellationToken = default,
+        bool includeArtwork = true)
     {
         try
         {
@@ -27,7 +30,9 @@ internal sealed class MediaSessionInfoProvider
                     continue;
                 }
 
-                var artworkBytes = await ReadArtworkBytesAsync(properties.Thumbnail, cancellationToken);
+                var artworkBytes = includeArtwork
+                    ? await ReadArtworkBytesAsync(properties.Thumbnail, cancellationToken)
+                    : null;
                 return new MediaTrackInfo(
                     title,
                     NullIfWhiteSpace(properties.Artist),

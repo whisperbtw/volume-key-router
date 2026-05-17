@@ -16,6 +16,21 @@ namespace VolumeKeyRouter;
 [SupportedOSPlatform("windows")]
 public sealed partial class MainWindow : Window
 {
+    private static readonly TimeSpan[] PeekMediaProbeDelays = { TimeSpan.Zero };
+    private static readonly TimeSpan[] PlaybackMediaProbeDelays =
+    {
+        TimeSpan.FromMilliseconds(80),
+        TimeSpan.FromMilliseconds(120),
+        TimeSpan.FromMilliseconds(180)
+    };
+    private static readonly TimeSpan[] TrackMediaProbeDelays =
+    {
+        TimeSpan.FromMilliseconds(90),
+        TimeSpan.FromMilliseconds(120),
+        TimeSpan.FromMilliseconds(180),
+        TimeSpan.FromMilliseconds(260)
+    };
+
     private readonly EventWaitHandle? activationEvent;
     private readonly EventWaitHandle? shutdownEvent;
     private readonly CancellationTokenSource activationWatcherCancellation = new();
@@ -458,11 +473,7 @@ public sealed partial class MainWindow : Window
 
     private bool HandleMediaKey(MediaKeyCommand command)
     {
-        var delay = command == MediaKeyCommand.Peek
-            ? TimeSpan.Zero
-            : TimeSpan.FromMilliseconds(550);
-
-        _ = ShowCurrentMediaOverlayAfterManualMediaKeyAsync(delay);
+        _ = ShowCurrentMediaOverlayAfterManualMediaKeyAsync(command);
         return command == MediaKeyCommand.Peek;
     }
 
@@ -499,16 +510,74 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private async Task ShowCurrentMediaOverlayAfterManualMediaKeyAsync(TimeSpan delay)
+    private async Task ShowCurrentMediaOverlayAfterManualMediaKeyAsync(MediaKeyCommand command)
     {
         try
         {
-            if (delay > TimeSpan.Zero)
+            var requestId = Interlocked.Increment(ref overlayRequestId);
+            var snapshot = GetTargetSnapshot();
+            var cachedTrack = GetCachedMediaTrack();
+            var probeDelays = GetManualMediaProbeDelays(command);
+            MediaTrackInfo? lastTrack = null;
+
+            for (var index = 0; index < probeDelays.Length; index++)
             {
-                await Task.Delay(delay);
+                if (probeDelays[index] > TimeSpan.Zero)
+                {
+                    await Task.Delay(probeDelays[index]);
+                }
+
+                var mediaTrack = await GetFreshMediaTrackAsync(
+                    snapshot.DisplayName,
+                    includeArtwork: false,
+                    timeout: TimeSpan.FromMilliseconds(280));
+                if (mediaTrack is null)
+                {
+                    continue;
+                }
+
+                mediaTrack = ReuseCachedArtwork(mediaTrack);
+                lastTrack = mediaTrack;
+
+                if (command == MediaKeyCommand.Peek ||
+                    ShouldUseManualMediaProbe(command, cachedTrack, mediaTrack) ||
+                    index == probeDelays.Length - 1)
+                {
+                    CacheMediaTrack(mediaTrack);
+                    ShowMediaOverlay(
+                        requestId,
+                        mediaTrack.OverlayTitle,
+                        mediaTrack.DisplayText,
+                        mediaTrack.ArtworkBytes,
+                        GetCurrentTargetVolumeState(snapshot),
+                        honorOverlaySetting: false);
+                    _ = RefreshOverlayArtworkAsync(requestId, snapshot, mediaTrack, honorOverlaySetting: false);
+                    return;
+                }
             }
 
-            await ShowCurrentMediaOverlayAsync(force: true, honorOverlaySetting: false);
+            lastTrack ??= cachedTrack;
+            if (lastTrack is null)
+            {
+                ShowMediaOverlay(
+                    requestId,
+                    "Nada tocando",
+                    null,
+                    null,
+                    GetCurrentTargetVolumeState(snapshot),
+                    honorOverlaySetting: false);
+                return;
+            }
+
+            CacheMediaTrack(lastTrack);
+            ShowMediaOverlay(
+                requestId,
+                lastTrack.OverlayTitle,
+                lastTrack.DisplayText,
+                lastTrack.ArtworkBytes,
+                GetCurrentTargetVolumeState(snapshot),
+                honorOverlaySetting: false);
+            _ = RefreshOverlayArtworkAsync(requestId, snapshot, lastTrack, honorOverlaySetting: false);
         }
         catch
         {
@@ -549,17 +618,104 @@ public sealed partial class MainWindow : Window
             honorOverlaySetting);
     }
 
-    private async Task<MediaTrackInfo?> GetFreshMediaTrackAsync(string preferredTarget)
+    private async Task<MediaTrackInfo?> GetFreshMediaTrackAsync(
+        string preferredTarget,
+        bool includeArtwork = true,
+        TimeSpan? timeout = null)
     {
         try
         {
-            using var metadataTimeout = new CancellationTokenSource(TimeSpan.FromMilliseconds(900));
-            return await mediaSessionInfoProvider.GetCurrentTrackAsync(preferredTarget, metadataTimeout.Token);
+            using var metadataTimeout = new CancellationTokenSource(
+                timeout ?? TimeSpan.FromMilliseconds(includeArtwork ? 900 : 300));
+            return await mediaSessionInfoProvider.GetCurrentTrackAsync(
+                preferredTarget,
+                metadataTimeout.Token,
+                includeArtwork);
         }
         catch
         {
             return null;
         }
+    }
+
+    private async Task RefreshOverlayArtworkAsync(
+        long requestId,
+        TargetSnapshot snapshot,
+        MediaTrackInfo mediaTrack,
+        bool honorOverlaySetting)
+    {
+        if (mediaTrack.ArtworkBytes is not null && mediaTrack.ArtworkBytes.Length > 0)
+        {
+            return;
+        }
+
+        var freshTrack = await GetFreshMediaTrackAsync(
+            snapshot.DisplayName,
+            includeArtwork: true,
+            timeout: TimeSpan.FromMilliseconds(800));
+        if (freshTrack?.ArtworkBytes is null || !IsSameTrack(mediaTrack, freshTrack))
+        {
+            return;
+        }
+
+        CacheMediaTrack(freshTrack);
+        ShowMediaOverlay(
+            requestId,
+            freshTrack.OverlayTitle,
+            freshTrack.DisplayText,
+            freshTrack.ArtworkBytes,
+            GetCurrentTargetVolumeState(snapshot),
+            honorOverlaySetting);
+    }
+
+    private static TimeSpan[] GetManualMediaProbeDelays(MediaKeyCommand command)
+    {
+        return command switch
+        {
+            MediaKeyCommand.Peek => PeekMediaProbeDelays,
+            MediaKeyCommand.PlayPause or MediaKeyCommand.Stop => PlaybackMediaProbeDelays,
+            _ => TrackMediaProbeDelays
+        };
+    }
+
+    private bool ShouldUseManualMediaProbe(
+        MediaKeyCommand command,
+        MediaTrackInfo? previousTrack,
+        MediaTrackInfo mediaTrack)
+    {
+        if (previousTrack is null)
+        {
+            return true;
+        }
+
+        return command switch
+        {
+            MediaKeyCommand.PreviousTrack or MediaKeyCommand.NextTrack => !IsSameTrack(previousTrack, mediaTrack),
+            MediaKeyCommand.PlayPause or MediaKeyCommand.Stop => !IsSameTrack(previousTrack, mediaTrack) ||
+                previousTrack.PlaybackState != mediaTrack.PlaybackState,
+            _ => true
+        };
+    }
+
+    private MediaTrackInfo ReuseCachedArtwork(MediaTrackInfo mediaTrack)
+    {
+        if (mediaTrack.ArtworkBytes is not null && mediaTrack.ArtworkBytes.Length > 0)
+        {
+            return mediaTrack;
+        }
+
+        var cachedTrack = GetCachedMediaTrack();
+        return cachedTrack is not null &&
+            cachedTrack.ArtworkBytes is not null &&
+            IsSameTrack(cachedTrack, mediaTrack)
+                ? mediaTrack with { ArtworkBytes = cachedTrack.ArtworkBytes }
+                : mediaTrack;
+    }
+
+    private static bool IsSameTrack(MediaTrackInfo left, MediaTrackInfo right)
+    {
+        return string.Equals(left.Title, right.Title, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(left.Artist ?? string.Empty, right.Artist ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
 
     private void ShowMediaOverlay(

@@ -36,6 +36,8 @@ a interface, este README e os textos do projeto.
 - `Fn+F1` mostra o overlay com a musica atual, sem precisar mudar o volume.
 - Mantem a ultima capa em cache durante ajustes rapidos para evitar piscadas no
   overlay.
+- Reserva o espaco da capa enquanto ela carrega, evitando que texto e barra
+  mudem de posicao no meio da exibicao.
 - Nao usa a API do Spotify; as informacoes de musica vem dos controles de midia
   do Windows.
 

@@ -130,7 +130,9 @@ public sealed partial class VolumeOverlayWindow : Window
             currentArtworkFingerprint = 0;
             currentArtworkLength = 0;
             ArtworkFrame.Background = EmptyArtworkBrush;
-            ArtworkFrame.Visibility = Visibility.Collapsed;
+            ArtworkFrame.Visibility = ShouldReserveArtworkSpace()
+                ? Visibility.Hidden
+                : Visibility.Collapsed;
             return;
         }
 
@@ -159,8 +161,15 @@ public sealed partial class VolumeOverlayWindow : Window
             currentArtworkFingerprint = 0;
             currentArtworkLength = 0;
             ArtworkFrame.Background = EmptyArtworkBrush;
-            ArtworkFrame.Visibility = Visibility.Collapsed;
+            ArtworkFrame.Visibility = ShouldReserveArtworkSpace()
+                ? Visibility.Hidden
+                : Visibility.Collapsed;
         }
+    }
+
+    private bool ShouldReserveArtworkSpace()
+    {
+        return currentMediaDetail is not null;
     }
 
     private static int ComputeArtworkFingerprint(byte[] artworkBytes)
