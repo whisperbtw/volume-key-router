@@ -1,30 +1,29 @@
-# Volume Key Router v0.1.4
+# Volume Key Router v0.1.5
 
-## Destaques
+## Correcao
 
-- Overlay agora aparece quando o usuario troca faixa usando teclas de midia.
-- Overlay tambem aparece quando o usuario pausa ou volta a tocar usando tecla de
-  midia.
-- `Fn+F1` passa a mostrar o overlay com a musica atual, sem alterar volume.
-- Enquanto a captura estiver ativa, `F1` e a tecla de abrir app de midia sao
-  interceptadas para esse atalho.
-- A leitura de midia foi otimizada: titulo/artista aparecem primeiro e a capa
-  entra depois, sem segurar a abertura do overlay.
-- O overlay reserva o espaco da capa enquanto ela carrega, evitando o texto
-  pular de posicao quando a imagem aparece.
-- Mantem as melhorias anteriores: capa/titulo/artista no overlay, cache da capa
-  para reduzir piscadas e opcoes `Atualizar`/`Reparar` no instalador.
+- `F1` comum nao e mais interceptado pelo app.
+- O atalho de mostrar midia fica restrito a tecla especial de abrir app de
+  midia, que alguns teclados enviam ao apertar `Fn+F1`.
+- README atualizado para explicar que o Windows nao diferencia `Fn+F1` de `F1`
+  quando o teclado envia apenas `F1` puro.
+
+## Mantido da v0.1.4
+
+- Overlay por teclas manuais de midia.
+- Titulo/artista aparecem antes da capa, sem segurar a abertura do overlay.
+- Espaco da capa fica reservado enquanto ela carrega para evitar deslocamento
+  do texto.
+- Instalador com opcoes `Atualizar` e `Reparar`.
 
 ## Arquivo da Release
 
 ```text
-VolumeKeyRouterSetup-0.1.4.exe
+VolumeKeyRouterSetup-0.1.5.exe
 ```
 
 ## Notas
 
-- As informacoes de musica vem dos controles de midia do Windows. Se o player
-  nao publicar metadados, o overlay pode mostrar apenas o volume ou nada.
 - O instalador atualiza por cima da versao anterior e preserva as configuracoes
   em `%AppData%\volume-key-router\settings.json`.
 - O instalador nao usa assinatura/certificacao.

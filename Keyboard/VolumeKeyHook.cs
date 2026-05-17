@@ -13,7 +13,6 @@ internal sealed class VolumeKeyHook : IDisposable
 {
     private const int WhKeyboardLl = 13;
     private const int HcAction = 0;
-    private const int VkF1 = 0x70;
     private const int VkVolumeMute = 0xAD;
     private const int VkVolumeDown = 0xAE;
     private const int VkVolumeUp = 0xAF;
@@ -118,7 +117,6 @@ internal sealed class VolumeKeyHook : IDisposable
     {
         command = virtualKeyCode switch
         {
-            VkF1 => MediaKeyCommand.Peek,
             VkLaunchMediaSelect => MediaKeyCommand.Peek,
             VkMediaPreviousTrack => MediaKeyCommand.PreviousTrack,
             VkMediaNextTrack => MediaKeyCommand.NextTrack,
@@ -127,8 +125,7 @@ internal sealed class VolumeKeyHook : IDisposable
             _ => default
         };
 
-        return virtualKeyCode is VkF1 or
-            VkLaunchMediaSelect or
+        return virtualKeyCode is VkLaunchMediaSelect or
             VkMediaPreviousTrack or
             VkMediaNextTrack or
             VkMediaPlayPause or

@@ -73,7 +73,21 @@ Se o Windows bloquear o arquivo por ele ter vindo da internet:
    - `Linha/dispositivo selecionado`: controla a saida de audio inteira.
 4. Clique em `Ativar captura`.
 5. Use as teclas de volume do teclado.
-6. Use `Fn+F1` para mostrar a musica atual no overlay.
+6. Use `Fn+F1` para mostrar a musica atual no overlay sem mudar o volume.
+
+## Overlay de Midia e Fn+F1
+
+Com a captura ativa, `Fn+F1` mostra o overlay com a musica atual. Ele serve
+como um atalho rapido para ver o que esta tocando, incluindo titulo, artista e
+capa quando o player entrega essas informacoes ao Windows.
+
+O Volume Key Router intercepta a tecla especial de abrir app de midia que alguns
+teclados enviam ao apertar `Fn+F1`. O `F1` comum continua livre para funcionar
+normalmente nos outros aplicativos.
+
+O overlay tambem aparece quando o usuario troca faixa, pausa ou volta a tocar
+usando teclas de midia. Trocas automaticas feitas pelo player nao abrem o
+overlay sozinhas.
 
 ## Exemplo: Voicemeeter AUX
 
@@ -172,10 +186,10 @@ diagnostico:
 
 - A tecla `Fn` normalmente nao chega ao Windows. O app captura o evento de
   volume gerado pelo driver ou firmware do teclado.
-- `Fn+F1` normalmente chega ao Windows como `F1`. Enquanto a captura estiver
-  ativa, o app intercepta `F1` para mostrar a musica atual no overlay.
 - Em alguns teclados, `Fn+F1` chega como tecla de abrir app de midia. Essa tecla
-  tambem e interceptada para mostrar o overlay em vez de abrir outro app.
+  e interceptada para mostrar o overlay em vez de abrir outro app.
+- O `F1` comum nao e interceptado. Se o seu teclado enviar `Fn+F1` como `F1`
+  puro, o Windows nao permite diferenciar `Fn+F1` de `F1`.
 - Um app so aparece na lista quando o Windows cria uma sessao de audio para ele.
 - Titulo, artista e capa no overlay dependem do player publicar metadados para
   os controles de midia do Windows. Se o player nao publicar, o overlay continua
