@@ -21,8 +21,10 @@ public sealed partial class MainWindow : Window
     private readonly CancellationTokenSource activationWatcherCancellation = new();
     private readonly AppSettings settings;
     private readonly AudioManager audioManager = new();
+    private readonly MediaSessionInfoProvider mediaSessionInfoProvider = new();
     private readonly object targetGate = new();
     private readonly object applyGate = new();
+    private readonly object mediaCacheGate = new();
     private readonly Forms.NotifyIcon trayIcon = new();
     private readonly Forms.ContextMenuStrip trayMenu = new();
     private readonly Forms.ToolStripMenuItem trayToggleCaptureItem = new();
@@ -44,6 +46,10 @@ public sealed partial class MainWindow : Window
     private bool runtimeInitialized;
     private bool startHiddenToTray;
     private bool allowClose;
+    private long overlayRequestId;
+    private MediaTrackInfo? cachedMediaTrack;
+    private DateTime cachedMediaTrackUtc;
+    private DateTime lastMediaLookupUtc;
 
     public ObservableCollection<SessionRow> Sessions { get; } = new();
 
@@ -402,6 +408,9 @@ public sealed partial class MainWindow : Window
                         : audioManager.ApplyToSessions(snapshot.DeviceId, snapshot.SessionTarget, snapshot.Step, 0, 1, command);
                 }
 
+                var requestId = Interlocked.Increment(ref overlayRequestId);
+                var cachedTrack = GetCachedMediaTrack();
+
                 BeginInvokeSafe(() =>
                 {
                     if (result.ChangedSessions == 0)
@@ -422,10 +431,21 @@ public sealed partial class MainWindow : Window
 
                         if (ShowOverlayBox.IsChecked == true)
                         {
-                            volumeOverlay.ShowVolume(result.TargetLabel, result.IsMuteCommand && result.IsMuted ? 0 : result.After);
+                            volumeOverlay.ShowVolume(
+                                result.TargetLabel,
+                                result.IsMuteCommand && result.IsMuted ? 0 : result.After,
+                                cachedTrack?.DisplayText,
+                                result.IsMuteCommand && result.IsMuted,
+                                cachedTrack?.ArtworkBytes,
+                                preserveMedia: cachedTrack is null);
                         }
                     }
                 });
+
+                if (result.ChangedSessions > 0 && ShouldRefreshMediaTrack())
+                {
+                    _ = UpdateOverlayMediaInfoAsync(snapshot.DisplayName, result, requestId);
+                }
             }
             catch (Exception ex)
             {
@@ -434,6 +454,73 @@ public sealed partial class MainWindow : Window
         });
 
         return true;
+    }
+
+    private async Task UpdateOverlayMediaInfoAsync(string preferredTarget, VolumeAdjustmentResult result, long requestId)
+    {
+        try
+        {
+            using var metadataTimeout = new CancellationTokenSource(TimeSpan.FromMilliseconds(750));
+            var mediaTrack = await mediaSessionInfoProvider.GetCurrentTrackAsync(preferredTarget, metadataTimeout.Token);
+            if (mediaTrack is null)
+            {
+                return;
+            }
+
+            CacheMediaTrack(mediaTrack);
+
+            BeginInvokeSafe(() =>
+            {
+                if (requestId != Interlocked.Read(ref overlayRequestId) || ShowOverlayBox.IsChecked != true)
+                {
+                    return;
+                }
+
+                volumeOverlay.ShowVolume(
+                    result.TargetLabel,
+                    result.IsMuteCommand && result.IsMuted ? 0 : result.After,
+                    mediaTrack.DisplayText,
+                    result.IsMuteCommand && result.IsMuted,
+                    mediaTrack.ArtworkBytes);
+            });
+        }
+        catch
+        {
+        }
+    }
+
+    private MediaTrackInfo? GetCachedMediaTrack()
+    {
+        lock (mediaCacheGate)
+        {
+            return cachedMediaTrack is not null && DateTime.UtcNow - cachedMediaTrackUtc <= TimeSpan.FromSeconds(30)
+                ? cachedMediaTrack
+                : null;
+        }
+    }
+
+    private bool ShouldRefreshMediaTrack()
+    {
+        lock (mediaCacheGate)
+        {
+            var now = DateTime.UtcNow;
+            if (now - lastMediaLookupUtc < TimeSpan.FromMilliseconds(900))
+            {
+                return false;
+            }
+
+            lastMediaLookupUtc = now;
+            return true;
+        }
+    }
+
+    private void CacheMediaTrack(MediaTrackInfo mediaTrack)
+    {
+        lock (mediaCacheGate)
+        {
+            cachedMediaTrack = mediaTrack;
+            cachedMediaTrackUtc = DateTime.UtcNow;
+        }
     }
 
     private void UpdateSelectedSessionVolume(float volume)

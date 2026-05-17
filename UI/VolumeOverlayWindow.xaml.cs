@@ -1,8 +1,15 @@
 using System.Globalization;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using MediaBrush = System.Windows.Media.Brush;
+using MediaColor = System.Windows.Media.Color;
+using MediaImageBrush = System.Windows.Media.ImageBrush;
+using MediaSolidColorBrush = System.Windows.Media.SolidColorBrush;
+using MediaStretch = System.Windows.Media.Stretch;
 
 namespace VolumeKeyRouter;
 
@@ -17,12 +24,19 @@ public sealed partial class VolumeOverlayWindow : Window
     private const uint SwpNoSize = 0x0001;
     private const uint SwpNoActivate = 0x0010;
     private const uint SwpShowWindow = 0x0040;
+    private static readonly MediaBrush ActiveBrush = new MediaSolidColorBrush(MediaColor.FromRgb(38, 208, 124));
+    private static readonly MediaBrush MutedBrush = new MediaSolidColorBrush(MediaColor.FromRgb(255, 107, 107));
+    private static readonly MediaBrush EmptyArtworkBrush = new MediaSolidColorBrush(MediaColor.FromRgb(42, 47, 58));
 
     private readonly DispatcherTimer hideTimer = new()
     {
         Interval = TimeSpan.FromMilliseconds(HideDelayMs)
     };
     private float currentVolume;
+    private string? currentMediaDetail;
+    private int currentArtworkFingerprint;
+    private int currentArtworkLength;
+    private bool hasArtwork;
 
     public VolumeOverlayWindow()
     {
@@ -43,12 +57,24 @@ public sealed partial class VolumeOverlayWindow : Window
         SetWindowLong(handle, GwlExStyle, style | WsExNoActivate | WsExToolWindow);
     }
 
-    public void ShowVolume(string target, float volume)
+    public void ShowVolume(
+        string target,
+        float volume,
+        string? detail = null,
+        bool isMuted = false,
+        byte[]? artworkBytes = null,
+        bool preserveMedia = false)
     {
         var clamped = Math.Clamp(volume, 0f, 1f);
-        currentVolume = clamped;
+        currentVolume = isMuted ? 0 : clamped;
         TargetText.Text = string.IsNullOrWhiteSpace(target) ? "Volume" : target;
-        PercentText.Text = clamped.ToString("P0", CultureInfo.CurrentCulture);
+        PercentText.Text = isMuted ? "MUDO" : clamped.ToString("P0", CultureInfo.CurrentCulture);
+        BarFill.Background = isMuted ? MutedBrush : ActiveBrush;
+        if (!preserveMedia)
+        {
+            UpdateMedia(detail, artworkBytes);
+        }
+
         UpdateBarFill();
 
         PositionNearTaskbar();
@@ -67,6 +93,88 @@ public sealed partial class VolumeOverlayWindow : Window
     {
         var availableWidth = BarTrack.ActualWidth > 0 ? BarTrack.ActualWidth : 320;
         BarFill.Width = Math.Max(0, availableWidth * currentVolume);
+    }
+
+    private void UpdateMedia(string? detail, byte[]? artworkBytes)
+    {
+        var normalizedDetail = string.IsNullOrWhiteSpace(detail) ? null : detail;
+        if (normalizedDetail == currentMediaDetail && ArtworkMatches(artworkBytes))
+        {
+            return;
+        }
+
+        currentMediaDetail = normalizedDetail;
+        DetailText.Text = normalizedDetail ?? string.Empty;
+        DetailText.Visibility = normalizedDetail is null ? Visibility.Collapsed : Visibility.Visible;
+        UpdateArtwork(artworkBytes);
+    }
+
+    private bool ArtworkMatches(byte[]? artworkBytes)
+    {
+        if (artworkBytes is null || artworkBytes.Length == 0)
+        {
+            return !hasArtwork;
+        }
+
+        var fingerprint = ComputeArtworkFingerprint(artworkBytes);
+        return hasArtwork &&
+            artworkBytes.Length == currentArtworkLength &&
+            fingerprint == currentArtworkFingerprint;
+    }
+
+    private void UpdateArtwork(byte[]? artworkBytes)
+    {
+        if (artworkBytes is null || artworkBytes.Length == 0)
+        {
+            hasArtwork = false;
+            currentArtworkFingerprint = 0;
+            currentArtworkLength = 0;
+            ArtworkFrame.Background = EmptyArtworkBrush;
+            ArtworkFrame.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        try
+        {
+            using var imageStream = new MemoryStream(artworkBytes);
+            var bitmap = new BitmapImage();
+            bitmap.BeginInit();
+            bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.StreamSource = imageStream;
+            bitmap.EndInit();
+            bitmap.Freeze();
+
+            ArtworkFrame.Background = new MediaImageBrush(bitmap)
+            {
+                Stretch = MediaStretch.UniformToFill
+            };
+            hasArtwork = true;
+            currentArtworkFingerprint = ComputeArtworkFingerprint(artworkBytes);
+            currentArtworkLength = artworkBytes.Length;
+            ArtworkFrame.Visibility = Visibility.Visible;
+        }
+        catch
+        {
+            hasArtwork = false;
+            currentArtworkFingerprint = 0;
+            currentArtworkLength = 0;
+            ArtworkFrame.Background = EmptyArtworkBrush;
+            ArtworkFrame.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private static int ComputeArtworkFingerprint(byte[] artworkBytes)
+    {
+        unchecked
+        {
+            var hash = 17;
+            foreach (var value in artworkBytes)
+            {
+                hash = (hash * 31) + value;
+            }
+
+            return hash;
+        }
     }
 
     private void PositionNearTaskbar()

@@ -18,6 +18,8 @@ a interface, este README e os textos do projeto.
 - Controla o volume de um aplicativo/processo especifico.
 - Controla o volume de uma saida inteira, como `Voicemeeter AUX Input`.
 - Mute (`Fn+F4`) afeta apenas o app ou a linha selecionada.
+- Se o alvo estiver mutado, `Volume Up` ou `Volume Down` desmuta o alvo antes
+  de ajustar o volume.
 - Permite escolher o alvo pela interface grafica.
 - Salva a ultima escolha e tenta restaura-la ao abrir novamente.
 - Se o ultimo app ou dispositivo ainda nao estiver disponivel, procura em
@@ -27,7 +29,12 @@ a interface, este README e os textos do projeto.
 - Pode iniciar minimizado no tray quando for aberto pelo Windows.
 - Impede duas instancias abertas ao mesmo tempo.
 - Mostra um overlay proprio quando o volume muda.
-- Nao usa a API do Spotify.
+- O overlay pode mostrar titulo, artista e capa da musica atual quando o player
+  entrega essas informacoes ao Windows.
+- Mantem a ultima capa em cache durante ajustes rapidos para evitar piscadas no
+  overlay.
+- Nao usa a API do Spotify; as informacoes de musica vem dos controles de midia
+  do Windows.
 
 ## Download
 
@@ -158,6 +165,9 @@ diagnostico:
 - A tecla `Fn` normalmente nao chega ao Windows. O app captura o evento de
   volume gerado pelo driver ou firmware do teclado.
 - Um app so aparece na lista quando o Windows cria uma sessao de audio para ele.
+- Titulo, artista e capa no overlay dependem do player publicar metadados para
+  os controles de midia do Windows. Se o player nao publicar, o overlay continua
+  funcionando apenas com o volume.
 - Se voce usa Spotify Web, o processo pode aparecer como `chrome`, `msedge` ou
   `firefox`, nao como `Spotify`.
 - Se um app roda como administrador e o hook nao pega as teclas nesse contexto,

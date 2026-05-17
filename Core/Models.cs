@@ -95,3 +95,10 @@ internal readonly record struct VolumeAdjustmentResult(
 {
     public static VolumeAdjustmentResult NotFound => new(0, 0, 0, string.Empty);
 }
+
+internal sealed record MediaTrackInfo(string Title, string? Artist, byte[]? ArtworkBytes)
+{
+    public string DisplayText => string.IsNullOrWhiteSpace(Artist)
+        ? Title
+        : $"{Artist} - {Title}";
+}

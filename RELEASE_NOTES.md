@@ -1,24 +1,26 @@
-# Volume Key Router v0.1.1
+# Volume Key Router v0.1.2
 
 ## Destaques
 
-- Interface migrada para WPF.
-- Novo instalador Inno Setup (`VolumeKeyRouterSetup-0.1.1.exe`).
-- Instalador atualiza por cima da versao anterior usando o mesmo `AppId`.
-- Instalador fecha o app aberto de forma graciosa antes de substituir arquivos.
-- Configuracoes continuam em `%AppData%\volume-key-router\settings.json`.
-- Mute (`Fn+F4` / `Volume Mute`) agora afeta apenas o app ou linha selecionada.
-- Overlay de volume refeito em WPF e ajustado para DPI.
-- Salvamento de configuracoes corrigido para nao sobrescrever preferencias ao abrir.
+- Overlay agora tenta mostrar titulo, artista e capa da musica atual.
+- A capa da musica fica em cache durante ajustes rapidos para reduzir piscadas.
+- Se o alvo estiver mutado, `Volume Up` ou `Volume Down` desmuta o app/linha
+  selecionado antes de ajustar o volume.
+- Mute (`Fn+F4` / `Volume Mute`) continua afetando apenas o app ou linha
+  selecionada.
+- A leitura de musica/capa e opcional: quando o player nao publica metadados no
+  Windows, o overlay segue mostrando apenas o volume.
 
 ## Arquivo da Release
 
 ```text
-VolumeKeyRouterSetup-0.1.1.exe
+VolumeKeyRouterSetup-0.1.2.exe
 ```
 
 ## Notas
 
-- O app agora depende de arquivos nativos WPF na pasta instalada. Por isso, a
-  distribuicao recomendada e o instalador, nao apenas o `volume-key-router.exe`.
+- As informacoes de musica vem dos controles de midia do Windows. O app nao usa
+  API do Spotify.
+- O instalador atualiza por cima da versao anterior e preserva as configuracoes
+  em `%AppData%\volume-key-router\settings.json`.
 - O instalador nao usa assinatura/certificacao.

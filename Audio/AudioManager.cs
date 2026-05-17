@@ -125,18 +125,24 @@ internal sealed class AudioManager : IDisposable
                     continue;
                 }
 
-                var currentVolume = session.SimpleAudioVolume.Volume;
+                var volumeControl = session.SimpleAudioVolume;
+                var currentVolume = volumeControl.Volume;
                 var nextVolume = currentVolume;
                 var isMuted = false;
                 if (command == VolumeCommand.Mute)
                 {
-                    isMuted = !session.SimpleAudioVolume.Mute;
-                    session.SimpleAudioVolume.Mute = isMuted;
+                    isMuted = !volumeControl.Mute;
+                    volumeControl.Mute = isMuted;
                 }
                 else
                 {
+                    if (volumeControl.Mute)
+                    {
+                        volumeControl.Mute = false;
+                    }
+
                     nextVolume = CalculateNextVolume(currentVolume, step, minimum, maximum, command);
-                    session.SimpleAudioVolume.Volume = nextVolume;
+                    volumeControl.Volume = nextVolume;
                 }
 
                 changed++;
@@ -179,6 +185,12 @@ internal sealed class AudioManager : IDisposable
             }
             else
             {
+                if (isMuted)
+                {
+                    endpointVolume.Mute = false;
+                    isMuted = false;
+                }
+
                 nextVolume = CalculateNextVolume(currentVolume, step, minimum, maximum, command);
                 endpointVolume.MasterVolumeLevelScalar = nextVolume;
             }
