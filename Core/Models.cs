@@ -54,6 +54,15 @@ internal enum MediaPlaybackState
     Stopped
 }
 
+internal enum MediaKeyCommand
+{
+    Peek,
+    PreviousTrack,
+    NextTrack,
+    PlayPause,
+    Stop
+}
+
 internal sealed record AudioDeviceInfo(string Id, string Name, bool IsDefault)
 {
     public override string ToString()

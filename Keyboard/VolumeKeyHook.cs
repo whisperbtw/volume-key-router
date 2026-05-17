@@ -17,13 +17,18 @@ internal sealed class VolumeKeyHook : IDisposable
     private const int VkVolumeMute = 0xAD;
     private const int VkVolumeDown = 0xAE;
     private const int VkVolumeUp = 0xAF;
+    private const int VkMediaNextTrack = 0xB0;
+    private const int VkMediaPreviousTrack = 0xB1;
+    private const int VkMediaStop = 0xB2;
+    private const int VkMediaPlayPause = 0xB3;
+    private const int VkLaunchMediaSelect = 0xB5;
     private const int WmKeyDown = 0x0100;
     private const int WmKeyUp = 0x0101;
     private const int WmSysKeyDown = 0x0104;
     private const int WmSysKeyUp = 0x0105;
 
     private readonly Func<VolumeCommand, bool> onCommand;
-    private readonly Func<bool>? onPeekMedia;
+    private readonly Func<MediaKeyCommand, bool>? onMediaKey;
     private readonly Func<bool> shouldBlockKeys;
     private readonly NativeMethods.LowLevelKeyboardProc callback;
     private IntPtr hookHandle;
@@ -31,11 +36,11 @@ internal sealed class VolumeKeyHook : IDisposable
     public VolumeKeyHook(
         Func<VolumeCommand, bool> onCommand,
         Func<bool> shouldBlockKeys,
-        Func<bool>? onPeekMedia = null)
+        Func<MediaKeyCommand, bool>? onMediaKey = null)
     {
         this.onCommand = onCommand;
         this.shouldBlockKeys = shouldBlockKeys;
-        this.onPeekMedia = onPeekMedia;
+        this.onMediaKey = onMediaKey;
         callback = HookCallback;
     }
 
@@ -72,15 +77,17 @@ internal sealed class VolumeKeyHook : IDisposable
             if (message is WmKeyDown or WmKeyUp or WmSysKeyDown or WmSysKeyUp)
             {
                 var key = Marshal.PtrToStructure<NativeMethods.KeyboardHookStruct>(lParam);
-                if (key.VirtualKeyCode == VkF1 && onPeekMedia is not null)
+                if (TryGetMediaKeyCommand(key.VirtualKeyCode, out var mediaCommand) && onMediaKey is not null)
                 {
                     if (message is WmKeyDown or WmSysKeyDown)
                     {
-                        var handled = onPeekMedia();
+                        var handled = onMediaKey(mediaCommand);
                         return handled ? 1 : NativeMethods.CallNextHookEx(hookHandle, nCode, wParam, lParam);
                     }
 
-                    return 1;
+                    return mediaCommand == MediaKeyCommand.Peek
+                        ? 1
+                        : NativeMethods.CallNextHookEx(hookHandle, nCode, wParam, lParam);
                 }
 
                 if (key.VirtualKeyCode is VkVolumeMute or VkVolumeDown or VkVolumeUp)
@@ -105,5 +112,26 @@ internal sealed class VolumeKeyHook : IDisposable
         }
 
         return NativeMethods.CallNextHookEx(hookHandle, nCode, wParam, lParam);
+    }
+
+    private static bool TryGetMediaKeyCommand(int virtualKeyCode, out MediaKeyCommand command)
+    {
+        command = virtualKeyCode switch
+        {
+            VkF1 => MediaKeyCommand.Peek,
+            VkLaunchMediaSelect => MediaKeyCommand.Peek,
+            VkMediaPreviousTrack => MediaKeyCommand.PreviousTrack,
+            VkMediaNextTrack => MediaKeyCommand.NextTrack,
+            VkMediaPlayPause => MediaKeyCommand.PlayPause,
+            VkMediaStop => MediaKeyCommand.Stop,
+            _ => default
+        };
+
+        return virtualKeyCode is VkF1 or
+            VkLaunchMediaSelect or
+            VkMediaPreviousTrack or
+            VkMediaNextTrack or
+            VkMediaPlayPause or
+            VkMediaStop;
     }
 }

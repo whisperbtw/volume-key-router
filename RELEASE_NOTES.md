@@ -2,10 +2,12 @@
 
 ## Destaques
 
-- Overlay agora aparece quando a musica muda.
-- Overlay tambem aparece quando o player pausa ou volta a tocar.
+- Overlay agora aparece quando o usuario troca faixa usando teclas de midia.
+- Overlay tambem aparece quando o usuario pausa ou volta a tocar usando tecla de
+  midia.
 - `Fn+F1` passa a mostrar o overlay com a musica atual, sem alterar volume.
-- Enquanto a captura estiver ativa, `F1` e interceptado para esse atalho.
+- Enquanto a captura estiver ativa, `F1` e a tecla de abrir app de midia sao
+  interceptadas para esse atalho.
 - Mantem as melhorias anteriores: capa/titulo/artista no overlay, cache da capa
   para reduzir piscadas e opcoes `Atualizar`/`Reparar` no instalador.
 

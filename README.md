@@ -31,7 +31,8 @@ a interface, este README e os textos do projeto.
 - Mostra um overlay proprio quando o volume muda.
 - O overlay pode mostrar titulo, artista e capa da musica atual quando o player
   entrega essas informacoes ao Windows.
-- O overlay tambem aparece quando a musica muda ou quando o player pausa/volta.
+- O overlay aparece quando o usuario troca faixa, pausa ou volta a tocar usando
+  teclas de midia.
 - `Fn+F1` mostra o overlay com a musica atual, sem precisar mudar o volume.
 - Mantem a ultima capa em cache durante ajustes rapidos para evitar piscadas no
   overlay.
@@ -171,6 +172,8 @@ diagnostico:
   volume gerado pelo driver ou firmware do teclado.
 - `Fn+F1` normalmente chega ao Windows como `F1`. Enquanto a captura estiver
   ativa, o app intercepta `F1` para mostrar a musica atual no overlay.
+- Em alguns teclados, `Fn+F1` chega como tecla de abrir app de midia. Essa tecla
+  tambem e interceptada para mostrar o overlay em vez de abrir outro app.
 - Um app so aparece na lista quando o Windows cria uma sessao de audio para ele.
 - Titulo, artista e capa no overlay dependem do player publicar metadados para
   os controles de midia do Windows. Se o player nao publicar, o overlay continua

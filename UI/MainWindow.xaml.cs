@@ -19,7 +19,6 @@ public sealed partial class MainWindow : Window
     private readonly EventWaitHandle? activationEvent;
     private readonly EventWaitHandle? shutdownEvent;
     private readonly CancellationTokenSource activationWatcherCancellation = new();
-    private readonly CancellationTokenSource mediaWatcherCancellation = new();
     private readonly AppSettings settings;
     private readonly AudioManager audioManager = new();
     private readonly MediaSessionInfoProvider mediaSessionInfoProvider = new();
@@ -38,7 +37,6 @@ public sealed partial class MainWindow : Window
     };
 
     private VolumeKeyHook? hook;
-    private MediaSessionChangeWatcher? mediaSessionChangeWatcher;
     private TargetSnapshot targetSnapshot = TargetSnapshot.Invalid;
     private bool captureActive;
     private bool refreshing;
@@ -52,8 +50,6 @@ public sealed partial class MainWindow : Window
     private MediaTrackInfo? cachedMediaTrack;
     private DateTime cachedMediaTrackUtc;
     private DateTime lastMediaLookupUtc;
-    private MediaOverlayFingerprint? lastMediaOverlayEvent;
-    private DateTime lastMediaOverlayEventUtc;
 
     public ObservableCollection<SessionRow> Sessions { get; } = new();
 
@@ -126,7 +122,6 @@ public sealed partial class MainWindow : Window
 
         var shouldStartCapture = settings.CaptureActive;
         StartActivationWatcher();
-        StartMediaSessionWatcher();
 
         suppressSettingsSave = true;
         try
@@ -349,7 +344,7 @@ public sealed partial class MainWindow : Window
 
         try
         {
-            hook = new VolumeKeyHook(HandleVolumeKey, HasValidTarget, HandlePeekMediaKey);
+            hook = new VolumeKeyHook(HandleVolumeKey, HasValidTarget, HandleMediaKey);
             hook.Install();
             captureActive = true;
             UpdateCaptureButton();
@@ -461,10 +456,14 @@ public sealed partial class MainWindow : Window
         return true;
     }
 
-    private bool HandlePeekMediaKey()
+    private bool HandleMediaKey(MediaKeyCommand command)
     {
-        _ = ShowCurrentMediaOverlayAsync(force: true, honorOverlaySetting: false);
-        return true;
+        var delay = command == MediaKeyCommand.Peek
+            ? TimeSpan.Zero
+            : TimeSpan.FromMilliseconds(550);
+
+        _ = ShowCurrentMediaOverlayAfterManualMediaKeyAsync(delay);
+        return command == MediaKeyCommand.Peek;
     }
 
     private async Task UpdateOverlayMediaInfoAsync(string preferredTarget, VolumeAdjustmentResult result, long requestId)
@@ -500,29 +499,20 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void StartMediaSessionWatcher()
+    private async Task ShowCurrentMediaOverlayAfterManualMediaKeyAsync(TimeSpan delay)
     {
-        if (mediaSessionChangeWatcher is not null)
+        try
         {
-            return;
+            if (delay > TimeSpan.Zero)
+            {
+                await Task.Delay(delay);
+            }
+
+            await ShowCurrentMediaOverlayAsync(force: true, honorOverlaySetting: false);
         }
-
-        mediaSessionChangeWatcher = new MediaSessionChangeWatcher(
-            () => ShowCurrentMediaOverlayAsync(force: false, honorOverlaySetting: true));
-
-        _ = Task.Run(async () =>
+        catch
         {
-            try
-            {
-                await mediaSessionChangeWatcher.StartAsync(mediaWatcherCancellation.Token);
-            }
-            catch (OperationCanceledException)
-            {
-            }
-            catch
-            {
-            }
-        });
+        }
     }
 
     private async Task ShowCurrentMediaOverlayAsync(bool force, bool honorOverlaySetting)
@@ -550,11 +540,6 @@ public sealed partial class MainWindow : Window
         }
 
         CacheMediaTrack(mediaTrack);
-        if (!force && !ShouldShowMediaOverlayEvent(mediaTrack))
-        {
-            return;
-        }
-
         ShowMediaOverlay(
             requestId,
             mediaTrack.OverlayTitle,
@@ -663,28 +648,6 @@ public sealed partial class MainWindow : Window
         {
             cachedMediaTrack = mediaTrack;
             cachedMediaTrackUtc = DateTime.UtcNow;
-        }
-    }
-
-    private bool ShouldShowMediaOverlayEvent(MediaTrackInfo mediaTrack)
-    {
-        var fingerprint = new MediaOverlayFingerprint(
-            mediaTrack.Title,
-            mediaTrack.Artist ?? string.Empty,
-            mediaTrack.PlaybackState);
-
-        lock (mediaCacheGate)
-        {
-            var now = DateTime.UtcNow;
-            if (lastMediaOverlayEvent == fingerprint &&
-                now - lastMediaOverlayEventUtc < TimeSpan.FromSeconds(2))
-            {
-                return false;
-            }
-
-            lastMediaOverlayEvent = fingerprint;
-            lastMediaOverlayEventUtc = now;
-            return true;
         }
     }
 
@@ -1118,11 +1081,8 @@ public sealed partial class MainWindow : Window
         SaveSettings();
         StopCapture(persist: false);
         activationWatcherCancellation.Cancel();
-        mediaWatcherCancellation.Cancel();
-        mediaSessionChangeWatcher?.Dispose();
         activationEvent?.Set();
         activationWatcherCancellation.Dispose();
-        mediaWatcherCancellation.Dispose();
         savedTargetSearchTimer.Stop();
         trayIcon.Visible = false;
         trayIcon.Dispose();
@@ -1281,8 +1241,4 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private readonly record struct MediaOverlayFingerprint(
-        string Title,
-        string Artist,
-        MediaPlaybackState PlaybackState);
 }
