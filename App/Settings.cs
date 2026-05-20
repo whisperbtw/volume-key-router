@@ -205,7 +205,11 @@ internal sealed class OverlaySettings
 {
     public OverlayPosition Position { get; set; } = OverlayPosition.BottomCenter;
 
+    public OverlaySizePreset SizePreset { get; set; } = OverlaySizePreset.Medium;
+
     public int Width { get; set; } = 430;
+
+    public int Height { get; set; } = 136;
 
     public int DurationMs { get; set; } = 1200;
 
@@ -215,7 +219,14 @@ internal sealed class OverlaySettings
 
     public void Normalize()
     {
-        Width = Math.Clamp(Width, 340, 620);
+        if (!Enum.IsDefined(SizePreset))
+        {
+            SizePreset = OverlaySizePreset.Medium;
+        }
+
+        var size = OverlaySizePresets.Get(SizePreset);
+        Width = size.Width;
+        Height = size.Height;
         DurationMs = Math.Clamp(DurationMs, 600, 5000);
         if (!Enum.IsDefined(Position))
         {
@@ -233,12 +244,33 @@ internal sealed class OverlaySettings
         return new OverlaySettings
         {
             Position = Position,
+            SizePreset = SizePreset,
             Width = Width,
+            Height = Height,
             DurationMs = DurationMs,
             ShowArtwork = ShowArtwork,
             Theme = Theme
         };
     }
+}
+
+internal static class OverlaySizePresets
+{
+    public static OverlaySize Get(OverlaySizePreset preset)
+    {
+        return preset switch
+        {
+            OverlaySizePreset.VerySmall => new OverlaySize(280, 86),
+            OverlaySizePreset.Small => new OverlaySize(340, 108),
+            OverlaySizePreset.Large => new OverlaySize(520, 164),
+            _ => new OverlaySize(430, 136)
+        };
+    }
+}
+
+internal readonly record struct OverlaySize(int Width, int Height)
+{
+    public string DisplayText => $"{Width} x {Height}";
 }
 
 internal sealed class ShortcutSettings

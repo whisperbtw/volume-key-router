@@ -31,6 +31,14 @@ internal enum OverlayTheme
     Light
 }
 
+internal enum OverlaySizePreset
+{
+    Small,
+    Medium,
+    Large,
+    VerySmall
+}
+
 [Flags]
 internal enum ShortcutModifiers
 {

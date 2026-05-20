@@ -27,10 +27,12 @@ public sealed partial class MainWindow : Window
     };
     private static readonly TimeSpan[] TrackMediaProbeDelays =
     {
-        TimeSpan.FromMilliseconds(90),
+        TimeSpan.FromMilliseconds(80),
         TimeSpan.FromMilliseconds(120),
-        TimeSpan.FromMilliseconds(180),
-        TimeSpan.FromMilliseconds(260)
+        TimeSpan.FromMilliseconds(170),
+        TimeSpan.FromMilliseconds(240),
+        TimeSpan.FromMilliseconds(340),
+        TimeSpan.FromMilliseconds(480)
     };
 
     private readonly EventWaitHandle? activationEvent;
@@ -90,6 +92,14 @@ public sealed partial class MainWindow : Window
     {
         new(OverlayTheme.Dark, "Escuro"),
         new(OverlayTheme.Light, "Claro")
+    };
+
+    private static readonly OverlayOption<OverlaySizePreset>[] OverlaySizeOptions =
+    {
+        new(OverlaySizePreset.VerySmall, "Muito pequeno"),
+        new(OverlaySizePreset.Small, "Pequeno"),
+        new(OverlaySizePreset.Medium, "Padrao"),
+        new(OverlaySizePreset.Large, "Grande")
     };
 
     public ObservableCollection<SessionRow> Sessions { get; } = new();
@@ -258,6 +268,8 @@ public sealed partial class MainWindow : Window
     {
         OverlayPositionCombo.ItemsSource = OverlayPositionOptions;
         OverlayThemeCombo.ItemsSource = OverlayThemeOptions;
+        OverlaySizeCombo.ItemsSource = OverlaySizeOptions;
+        CurrentVersionText.Text = $"Versao atual: {UpdateChecker.CurrentVersionText}";
     }
 
     private void ApplySettingsToControls()
@@ -320,7 +332,7 @@ public sealed partial class MainWindow : Window
     {
         SelectOverlayOption(OverlayPositionCombo, OverlayPositionOptions, settings.Overlay.Position);
         SelectOverlayOption(OverlayThemeCombo, OverlayThemeOptions, settings.Overlay.Theme);
-        OverlayWidthSlider.Value = settings.Overlay.Width;
+        SelectOverlayOption(OverlaySizeCombo, OverlaySizeOptions, settings.Overlay.SizePreset);
         OverlayDurationSlider.Value = settings.Overlay.DurationMs;
         OverlayArtworkBox.IsChecked = settings.Overlay.ShowArtwork;
         UpdateOverlayValueLabels();
@@ -349,7 +361,10 @@ public sealed partial class MainWindow : Window
             OverlayThemeCombo,
             OverlayThemeOptions,
             OverlayTheme.Dark);
-        settings.Overlay.Width = Math.Clamp((int)Math.Round(OverlayWidthSlider.Value), 340, 620);
+        settings.Overlay.SizePreset = GetSelectedOverlayValue(
+            OverlaySizeCombo,
+            OverlaySizeOptions,
+            OverlaySizePreset.Medium);
         settings.Overlay.DurationMs = Math.Clamp((int)Math.Round(OverlayDurationSlider.Value), 600, 5000);
         settings.Overlay.ShowArtwork = OverlayArtworkBox.IsChecked == true;
         settings.Overlay.Normalize();
@@ -388,9 +403,13 @@ public sealed partial class MainWindow : Window
 
     private void UpdateOverlayValueLabels()
     {
-        if (OverlayWidthValueText is not null && OverlayWidthSlider is not null)
+        if (OverlaySizeValueText is not null && OverlaySizeCombo is not null)
         {
-            OverlayWidthValueText.Text = $"{Math.Round(OverlayWidthSlider.Value)}px";
+            var preset = GetSelectedOverlayValue(
+                OverlaySizeCombo,
+                OverlaySizeOptions,
+                OverlaySizePreset.Medium);
+            OverlaySizeValueText.Text = OverlaySizePresets.Get(preset).DisplayText;
         }
 
         if (OverlayDurationValueText is not null && OverlayDurationSlider is not null)
@@ -976,7 +995,19 @@ public sealed partial class MainWindow : Window
             var snapshot = GetTargetSnapshot();
             var cachedTrack = GetCachedMediaTrack();
             var probeDelays = GetManualMediaProbeDelays(command);
+            var isTrackNavigation = IsTrackNavigationCommand(command);
             MediaTrackInfo? lastTrack = null;
+
+            if (isTrackNavigation)
+            {
+                ShowMediaOverlay(
+                    requestId,
+                    "Trocando midia",
+                    null,
+                    null,
+                    GetCurrentTargetVolumeState(snapshot),
+                    honorOverlaySetting: false);
+            }
 
             for (var index = 0; index < probeDelays.Length; index++)
             {
@@ -997,9 +1028,11 @@ public sealed partial class MainWindow : Window
                 mediaTrack = ReuseCachedArtwork(mediaTrack);
                 lastTrack = mediaTrack;
 
+                var isLastProbe = index == probeDelays.Length - 1;
                 if (command == MediaKeyCommand.Peek ||
                     ShouldUseManualMediaProbe(command, cachedTrack, mediaTrack) ||
-                    index == probeDelays.Length - 1)
+                    (!isTrackNavigation && isLastProbe) ||
+                    (isTrackNavigation && cachedTrack is null && isLastProbe))
                 {
                     CacheMediaTrack(mediaTrack);
                     ShowMediaOverlay(
@@ -1012,6 +1045,11 @@ public sealed partial class MainWindow : Window
                     _ = RefreshOverlayArtworkAsync(requestId, snapshot, mediaTrack, honorOverlaySetting: false);
                     return;
                 }
+            }
+
+            if (isTrackNavigation)
+            {
+                return;
             }
 
             lastTrack ??= cachedTrack;
@@ -1136,6 +1174,11 @@ public sealed partial class MainWindow : Window
         };
     }
 
+    private static bool IsTrackNavigationCommand(MediaKeyCommand command)
+    {
+        return command is MediaKeyCommand.PreviousTrack or MediaKeyCommand.NextTrack;
+    }
+
     private bool ShouldUseManualMediaProbe(
         MediaKeyCommand command,
         MediaTrackInfo? previousTrack,
@@ -1143,7 +1186,7 @@ public sealed partial class MainWindow : Window
     {
         if (previousTrack is null)
         {
-            return true;
+            return !IsTrackNavigationCommand(command);
         }
 
         return command switch
@@ -1825,6 +1868,59 @@ public sealed partial class MainWindow : Window
             {
                 SetStatus($"Nao consegui atualizar a inicializacao: {ex.Message}");
             }
+        }
+    }
+
+    private async void CheckUpdateButton_Click(object sender, RoutedEventArgs e)
+    {
+        var previousContent = CheckUpdateButton.Content;
+        CheckUpdateButton.IsEnabled = false;
+        CheckUpdateButton.Content = "Verificando...";
+        SetStatus("Verificando atualizacao...");
+
+        try
+        {
+            var result = await UpdateChecker.CheckLatestReleaseAsync();
+            if (result.IsUpdateAvailable)
+            {
+                SetStatus($"Atualizacao disponivel: {result.LatestVersionText}.");
+                var answer = System.Windows.MessageBox.Show(
+                    this,
+                    $"Existe uma versao nova: {result.LatestVersionText}.\n\nVersao instalada: {result.CurrentVersionText}\n\nAbrir a pagina da release?",
+                    "Atualizacao disponivel",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Information);
+
+                if (answer == MessageBoxResult.Yes)
+                {
+                    UpdateChecker.OpenReleasePage(result.ReleaseUrl);
+                }
+
+                return;
+            }
+
+            SetStatus($"Voce ja esta na versao mais recente ({result.CurrentVersionText}).");
+            System.Windows.MessageBox.Show(
+                this,
+                $"Voce ja esta na versao mais recente.\n\nVersao atual: {result.CurrentVersionText}",
+                "Atualizacao",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Nao consegui verificar atualizacao: {ex.Message}");
+            System.Windows.MessageBox.Show(
+                this,
+                $"Nao consegui verificar atualizacao agora.\n\n{ex.Message}",
+                "Atualizacao",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+        finally
+        {
+            CheckUpdateButton.Content = previousContent;
+            CheckUpdateButton.IsEnabled = true;
         }
     }
 

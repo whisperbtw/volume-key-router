@@ -24,13 +24,13 @@
 
             <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="34" />
+                <RowDefinition x:Name="TopRow" Height="34" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="94" />
+                <ColumnDefinition x:Name="PercentColumn" Width="94" />
             </Grid.ColumnDefinitions>
 
             <TextBlock x:Name="TargetText" Grid.Row="0" Grid.Column="0" Foreground="#B6BECA" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />

@@ -304,9 +304,9 @@
                         <TextBlock Grid.Row="1" Grid.Column="0" Text="Tema" VerticalAlignment="Center" Margin="0,0,12,12" />
                         <ComboBox x:Name="OverlayThemeCombo" Grid.Row="1" Grid.Column="1" Width="180" HorizontalAlignment="Left" Margin="0,0,0,12" SelectionChanged="OverlaySetting_Changed" />
 
-                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Largura" VerticalAlignment="Center" Margin="0,0,12,12" />
-                        <Slider x:Name="OverlayWidthSlider" Grid.Row="2" Grid.Column="1" Minimum="340" Maximum="620" TickFrequency="10" IsSnapToTickEnabled="True" ValueChanged="OverlaySlider_Changed" Margin="0,0,12,12" />
-                        <TextBlock x:Name="OverlayWidthValueText" Grid.Row="2" Grid.Column="2" TextAlignment="Right" VerticalAlignment="Center" Margin="0,0,0,12" />
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Tamanho" VerticalAlignment="Center" Margin="0,0,12,12" />
+                        <ComboBox x:Name="OverlaySizeCombo" Grid.Row="2" Grid.Column="1" Width="180" HorizontalAlignment="Left" Margin="0,0,0,12" SelectionChanged="OverlaySetting_Changed" />
+                        <TextBlock x:Name="OverlaySizeValueText" Grid.Row="2" Grid.Column="2" TextAlignment="Right" VerticalAlignment="Center" Margin="0,0,0,12" />
 
                         <TextBlock Grid.Row="3" Grid.Column="0" Text="Duracao" VerticalAlignment="Center" Margin="0,0,12,12" />
                         <Slider x:Name="OverlayDurationSlider" Grid.Row="3" Grid.Column="1" Minimum="600" Maximum="5000" TickFrequency="100" IsSnapToTickEnabled="True" ValueChanged="OverlaySlider_Changed" Margin="0,0,12,12" />
@@ -400,11 +400,18 @@
 
             <TabItem Header="Sistema">
                 <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Padding="16">
-                    <WrapPanel>
-                        <CheckBox x:Name="StartWithWindowsBox" Content="Iniciar com Windows" Checked="StartWithWindowsBox_Changed" Unchecked="StartWithWindowsBox_Changed" />
-                        <CheckBox x:Name="MinimizeToTrayBox" Content="Minimizar para tray" Checked="MinimizeToTrayBox_Changed" Unchecked="MinimizeToTrayBox_Changed" />
-                        <CheckBox x:Name="StartMinimizedBox" Content="Iniciar minimizado com Windows" Checked="StartMinimizedBox_Changed" Unchecked="StartMinimizedBox_Changed" />
-                    </WrapPanel>
+                    <StackPanel>
+                        <WrapPanel>
+                            <CheckBox x:Name="StartWithWindowsBox" Content="Iniciar com Windows" Checked="StartWithWindowsBox_Changed" Unchecked="StartWithWindowsBox_Changed" />
+                            <CheckBox x:Name="MinimizeToTrayBox" Content="Minimizar para tray" Checked="MinimizeToTrayBox_Changed" Unchecked="MinimizeToTrayBox_Changed" />
+                            <CheckBox x:Name="StartMinimizedBox" Content="Iniciar minimizado com Windows" Checked="StartMinimizedBox_Changed" Unchecked="StartMinimizedBox_Changed" />
+                        </WrapPanel>
+
+                        <WrapPanel Margin="0,12,0,0">
+                            <Button x:Name="CheckUpdateButton" Content="Verificar atualizacao" Margin="0,0,12,0" Click="CheckUpdateButton_Click" />
+                            <TextBlock x:Name="CurrentVersionText" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" />
+                        </WrapPanel>
+                    </StackPanel>
                 </Border>
             </TabItem>
         </TabControl>

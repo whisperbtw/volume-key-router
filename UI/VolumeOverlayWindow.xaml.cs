@@ -56,6 +56,8 @@ public sealed partial class VolumeOverlayWindow : Window
     {
         settings.Normalize();
         Width = settings.Width;
+        Height = settings.Height;
+        ApplySizePreset(settings.SizePreset);
         hideTimer.Interval = TimeSpan.FromMilliseconds(settings.DurationMs);
         showArtwork = settings.ShowArtwork;
         overlayPosition = settings.Position;
@@ -83,6 +85,47 @@ public sealed partial class VolumeOverlayWindow : Window
             PositionNearTaskbar();
             BringToTopWithoutActivation();
         }
+    }
+
+    private void ApplySizePreset(OverlaySizePreset preset)
+    {
+        if (preset == OverlaySizePreset.VerySmall)
+        {
+            RootBorder.Padding = new Thickness(10, 9, 11, 9);
+            RootBorder.CornerRadius = new CornerRadius(10);
+            ArtworkFrame.Width = 48;
+            ArtworkFrame.Height = 48;
+            ArtworkFrame.Margin = new Thickness(0, 0, 8, 0);
+            ArtworkFrame.CornerRadius = new CornerRadius(6);
+            TopRow.Height = new GridLength(24);
+            PercentColumn.Width = new GridLength(60);
+            TargetText.FontSize = 11;
+            PercentText.FontSize = 18;
+            DetailText.FontSize = 11;
+            DetailText.Margin = new Thickness(0, 0, 0, 4);
+            BarBackground.Height = 8;
+            BarBackground.Padding = new Thickness(1);
+            BarBackground.CornerRadius = new CornerRadius(2);
+            BarFill.CornerRadius = new CornerRadius(1);
+            return;
+        }
+
+        RootBorder.Padding = new Thickness(16, 14, 18, 16);
+        RootBorder.CornerRadius = new CornerRadius(14);
+        ArtworkFrame.Width = 76;
+        ArtworkFrame.Height = 76;
+        ArtworkFrame.Margin = new Thickness(0, 0, 14, 0);
+        ArtworkFrame.CornerRadius = new CornerRadius(8);
+        TopRow.Height = new GridLength(34);
+        PercentColumn.Width = new GridLength(94);
+        TargetText.FontSize = 12;
+        PercentText.FontSize = 24;
+        DetailText.FontSize = 13;
+        DetailText.Margin = new Thickness(0, 0, 0, 8);
+        BarBackground.Height = 14;
+        BarBackground.Padding = new Thickness(2);
+        BarBackground.CornerRadius = new CornerRadius(3);
+        BarFill.CornerRadius = new CornerRadius(2);
     }
 
     protected override void OnSourceInitialized(EventArgs e)

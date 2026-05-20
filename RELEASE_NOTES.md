@@ -1,33 +1,29 @@
-# Volume Key Router v0.2.0
+# Volume Key Router v0.3.0
 
 ## Novidades
 
-- Aba `Overlay` com posicao, largura, duracao, tema claro/escuro e opcao de
-  mostrar ou ocultar a capa.
-- Aba `Atalhos` com gravacao de combinacoes de teclas.
-- Atalhos aceitam modificadores como `Ctrl`, `Shift`, `Alt` e `Win`.
-- Botao `↺` ao lado de cada atalho para restaurar somente aquela funcao.
-- Botao `Redefinir todos` para voltar todos os atalhos ao padrao.
-- Bloqueio de atalhos duplicados na interface.
-- Perfis para guardar alvo, dispositivo, passo e atalhos diferentes.
-- Menu da bandeja com abrir janela, mostrar overlay, pausar roteamento,
-  recarregar dispositivos, trocar perfil e sair.
+- Aba `Sistema` agora tem o botao `Verificar atualizacao`.
+- A verificacao manual compara a versao instalada com a ultima release do
+  GitHub e pode abrir a pagina da release quando houver versao nova.
+- O tamanho do overlay agora usa presets de tamanho total.
+- Novo preset `Muito pequeno` para quem quer um overlay bem compacto.
+- Presets disponiveis: `Muito pequeno`, `Pequeno`, `Padrao` e `Grande`.
 
-## Correcoes
+## Ajustes do overlay e da midia
 
-- Teclas `Fn+F2/F3/F4` voltam a ser capturadas mesmo quando o driver do teclado
-  envia eventos marcados como injetados.
-- O app ignora apenas teclas injetadas por ele mesmo ao repassar comandos de
-  midia para o Windows.
-- Texto selecionado em `Perfil`, `Posicao` e `Tema` nao fica mais preto no tema
-  escuro.
-- O overlay reposiciona corretamente ao mudar largura ou posicao.
-- Duplicatas vindas manualmente do `settings.json` sao desativadas ao carregar.
+- O overlay aplica largura e altura pelos presets, em vez de ajustar so a
+  largura.
+- O preset `Muito pequeno` usa padding, capa, textos e barra reduzidos para nao
+  ficar apenas espremido.
+- Ao avancar ou voltar faixa manualmente, o overlay espera metadados atualizados
+  antes de mostrar a musica, reduzindo o caso de aparecer a faixa anterior.
+- Enquanto a proxima faixa ainda nao chegou pelos controles de midia do Windows,
+  o overlay mostra `Trocando midia`.
 
 ## Arquivo da Release
 
 ```text
-VolumeKeyRouterSetup-0.2.0.exe
+VolumeKeyRouterSetup-0.3.0.exe
 ```
 
 ## Notas

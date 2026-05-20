@@ -31,9 +31,11 @@ a interface, este README e os textos do projeto.
   recarregar dispositivos, trocar perfil e sair.
 - Pode iniciar junto com o Windows.
 - Pode iniciar minimizado no tray quando for aberto pelo Windows.
+- Permite verificar manualmente se existe uma nova release na aba `Sistema`.
 - Impede duas instancias abertas ao mesmo tempo.
 - Mostra um overlay proprio quando o volume muda.
-- Permite ajustar posicao, largura, duracao, tema e exibicao da capa no overlay.
+- Permite ajustar posicao, tamanho por preset, duracao, tema e exibicao da capa
+  no overlay.
 - O overlay pode mostrar titulo, artista e capa da musica atual quando o player
   entrega essas informacoes ao Windows.
 - O overlay aparece quando o usuario troca faixa, pausa ou volta a tocar usando
@@ -81,9 +83,9 @@ Se o Windows bloquear o arquivo por ele ter vindo da internet:
 6. Use `Fn+F1` para mostrar a musica atual no overlay sem mudar o volume.
 
 As abas `Overlay`, `Atalhos`, `Perfis` e `Sistema` concentram as preferencias
-visuais, teclas capturadas, perfis de uso e opcoes de inicializacao. Na aba
-`Atalhos`, clique no botao da acao e pressione a tecla ou combinacao que deve
-acionar aquela funcao, como `Ctrl+Alt+F2`.
+visuais, teclas capturadas, perfis de uso, opcoes de inicializacao e verificacao
+manual de atualizacao. Na aba `Atalhos`, clique no botao da acao e pressione a
+tecla ou combinacao que deve acionar aquela funcao, como `Ctrl+Alt+F2`.
 
 ## Overlay de Midia e Fn+F1
 
@@ -98,6 +100,8 @@ normalmente nos outros aplicativos.
 O overlay tambem aparece quando o usuario troca faixa, pausa ou volta a tocar
 usando teclas de midia. Trocas automaticas feitas pelo player nao abrem o
 overlay sozinhas.
+Ao avancar ou voltar faixa manualmente, ele espera metadados atualizados para
+evitar mostrar a musica anterior.
 
 Esse atalho pode ser alterado na aba `Atalhos`. Se voce escolher `F1`, o `F1`
 comum passa a ser capturado porque essa foi uma escolha explicita.
