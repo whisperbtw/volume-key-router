@@ -25,6 +25,7 @@ internal static class ConsoleHost
 internal static class NativeMethods
 {
     public const int WmQuit = 0x0012;
+    public static readonly IntPtr VolumeKeyRouterInjectedKeyExtraInfo = new(0x56524B52);
     public static readonly IntPtr HwndBroadcast = new(0xFFFF);
     public static readonly int WmShowExistingApp = RegisterWindowMessage("VolumeKeyRouter.ShowExistingWindow");
     private const int DwmWindowAttributeUseImmersiveDarkModeBefore20H1 = 19;
@@ -69,6 +70,12 @@ internal static class NativeMethods
 
     [DllImport("user32.dll")]
     public static extern IntPtr DispatchMessage(ref Message lpMsg);
+
+    [DllImport("user32.dll")]
+    public static extern short GetAsyncKeyState(int virtualKeyCode);
+
+    [DllImport("user32.dll")]
+    public static extern void keybd_event(byte virtualKeyCode, byte scanCode, uint flags, IntPtr extraInfo);
 
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

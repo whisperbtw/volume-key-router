@@ -13,7 +13,9 @@ a interface, este README e os textos do projeto.
 ## Funcionalidades
 
 - Interface WPF com tema escuro.
-- Intercepta `Volume Up`, `Volume Down` e `Volume Mute`.
+- Intercepta `Volume Up`, `Volume Down` e `Volume Mute` por padrao.
+- Permite escolher quais teclas ou combinacoes acionam volume, mute e overlay
+  de midia.
 - Funciona com `Fn+F2/F3/F4`, quando o notebook envia essas teclas como volume.
 - Controla o volume de um aplicativo/processo especifico.
 - Controla o volume de uma saida inteira, como `Voicemeeter AUX Input`.
@@ -24,11 +26,14 @@ a interface, este README e os textos do projeto.
 - Salva a ultima escolha e tenta restaura-la ao abrir novamente.
 - Se o ultimo app ou dispositivo ainda nao estiver disponivel, procura em
   segundo plano sem ficar piscando a interface.
-- Fica no tray, com opcoes para abrir, ativar/pausar captura, atualizar e sair.
+- Tem perfis para guardar alvo, dispositivo, passo e atalhos diferentes.
+- Fica no tray, com opcoes para abrir, mostrar overlay, pausar roteamento,
+  recarregar dispositivos, trocar perfil e sair.
 - Pode iniciar junto com o Windows.
 - Pode iniciar minimizado no tray quando for aberto pelo Windows.
 - Impede duas instancias abertas ao mesmo tempo.
 - Mostra um overlay proprio quando o volume muda.
+- Permite ajustar posicao, largura, duracao, tema e exibicao da capa no overlay.
 - O overlay pode mostrar titulo, artista e capa da musica atual quando o player
   entrega essas informacoes ao Windows.
 - O overlay aparece quando o usuario troca faixa, pausa ou volta a tocar usando
@@ -75,6 +80,11 @@ Se o Windows bloquear o arquivo por ele ter vindo da internet:
 5. Use as teclas de volume do teclado.
 6. Use `Fn+F1` para mostrar a musica atual no overlay sem mudar o volume.
 
+As abas `Overlay`, `Atalhos`, `Perfis` e `Sistema` concentram as preferencias
+visuais, teclas capturadas, perfis de uso e opcoes de inicializacao. Na aba
+`Atalhos`, clique no botao da acao e pressione a tecla ou combinacao que deve
+acionar aquela funcao, como `Ctrl+Alt+F2`.
+
 ## Overlay de Midia e Fn+F1
 
 Com a captura ativa, `Fn+F1` mostra o overlay com a musica atual. Ele serve
@@ -88,6 +98,9 @@ normalmente nos outros aplicativos.
 O overlay tambem aparece quando o usuario troca faixa, pausa ou volta a tocar
 usando teclas de midia. Trocas automaticas feitas pelo player nao abrem o
 overlay sozinhas.
+
+Esse atalho pode ser alterado na aba `Atalhos`. Se voce escolher `F1`, o `F1`
+comum passa a ser capturado porque essa foi uma escolha explicita.
 
 ## Exemplo: Voicemeeter AUX
 

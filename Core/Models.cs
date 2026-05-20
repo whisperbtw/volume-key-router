@@ -15,6 +15,32 @@ internal enum TargetMode
     Device
 }
 
+internal enum OverlayPosition
+{
+    BottomCenter,
+    BottomRight,
+    BottomLeft,
+    TopCenter,
+    TopRight,
+    TopLeft
+}
+
+internal enum OverlayTheme
+{
+    Dark,
+    Light
+}
+
+[Flags]
+internal enum ShortcutModifiers
+{
+    None = 0,
+    Control = 1,
+    Shift = 2,
+    Alt = 4,
+    Win = 8
+}
+
 internal readonly record struct TargetSnapshot(
     bool IsValid,
     TargetMode Mode,

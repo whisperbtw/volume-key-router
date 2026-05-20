@@ -28,6 +28,16 @@
             <Setter Property="MinHeight" Value="32" />
         </Style>
 
+        <Style x:Key="IconButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Width" Value="32" />
+            <Setter Property="MinWidth" Value="32" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+
         <Style TargetType="ComboBox">
             <Setter Property="Background" Value="{StaticResource ControlBrush}" />
             <Setter Property="Foreground" Value="#F2F4F8" />
@@ -41,6 +51,7 @@
                                           Background="{TemplateBinding Background}"
                                           BorderBrush="{TemplateBinding BorderBrush}"
                                           BorderThickness="1"
+                                          Foreground="{TemplateBinding Foreground}"
                                           Focusable="False"
                                           IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
                                           ClickMode="Press">
@@ -62,7 +73,8 @@
                                                                   IsHitTestVisible="False"
                                                                   Content="{Binding SelectionBoxItem, RelativeSource={RelativeSource AncestorType=ComboBox}}"
                                                                   ContentTemplate="{Binding SelectionBoxItemTemplate, RelativeSource={RelativeSource AncestorType=ComboBox}}"
-                                                                  ContentStringFormat="{Binding SelectionBoxItemStringFormat, RelativeSource={RelativeSource AncestorType=ComboBox}}" />
+                                                                  ContentStringFormat="{Binding SelectionBoxItemStringFormat, RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                                                  TextElement.Foreground="{TemplateBinding Foreground}" />
                                                 <Border Grid.Column="1" Background="#252A34" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1,0,0,0">
                                                     <Path Width="10"
                                                           Height="6"
@@ -127,9 +139,51 @@
             <Setter Property="Margin" Value="0,3,18,3" />
         </Style>
 
+        <Style TargetType="TextBox">
+            <Setter Property="Background" Value="{StaticResource ControlBrush}" />
+            <Setter Property="Foreground" Value="#F2F4F8" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="8,5" />
+            <Setter Property="MinHeight" Value="32" />
+        </Style>
+
         <Style TargetType="RadioButton">
             <Setter Property="Foreground" Value="#F2F4F8" />
             <Setter Property="Margin" Value="0,3,18,3" />
+        </Style>
+
+        <Style TargetType="TabControl">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+
+        <Style TargetType="TabItem">
+            <Setter Property="Foreground" Value="#F2F4F8" />
+            <Setter Property="Padding" Value="12,7" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="TabBorder"
+                                Background="{StaticResource ControlBrush}"
+                                BorderBrush="{StaticResource BorderBrush}"
+                                BorderThickness="1,1,1,0"
+                                Margin="0,0,4,0"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter ContentSource="Header" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="TabBorder" Property="Background" Value="{StaticResource PanelBrush}" />
+                                <Setter TargetName="TabBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="TabBorder" Property="Background" Value="{StaticResource ControlHoverBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <Style TargetType="DataGrid">
@@ -160,15 +214,19 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0"
-                   Text="Escolha o app ou a linha de saida que as teclas de volume vao controlar"
-                   FontWeight="SemiBold"
-                   Margin="0,0,0,10" />
+        <DockPanel Grid.Row="0" Margin="0,0,0,10" LastChildFill="True">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="Perfil" VerticalAlignment="Center" Margin="0,0,8,0" />
+                <ComboBox x:Name="ProfileCombo" Width="180" SelectionChanged="ProfileCombo_SelectionChanged" />
+            </StackPanel>
+            <TextBlock Text="Escolha o app ou a linha de saida que as teclas de volume vao controlar"
+                       FontWeight="SemiBold"
+                       VerticalAlignment="Center" />
+        </DockPanel>
 
         <Grid Grid.Row="1" Margin="0,0,0,12">
             <Grid.ColumnDefinitions>
@@ -209,23 +267,148 @@
             <TextBlock x:Name="TargetText" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" Margin="0,0,0,4" />
         </Grid>
 
-        <WrapPanel Grid.Row="2" Margin="0,0,0,10">
-            <CheckBox x:Name="StartWithWindowsBox" Content="Iniciar com Windows" Checked="StartWithWindowsBox_Changed" Unchecked="StartWithWindowsBox_Changed" />
-            <CheckBox x:Name="MinimizeToTrayBox" Content="Minimizar para tray" Checked="MinimizeToTrayBox_Changed" Unchecked="MinimizeToTrayBox_Changed" />
-            <CheckBox x:Name="StartMinimizedBox" Content="Iniciar minimizado com Windows" Checked="StartMinimizedBox_Changed" Unchecked="StartMinimizedBox_Changed" />
-            <CheckBox x:Name="ShowOverlayBox" Content="Mostrar overlay de volume" Checked="ShowOverlayBox_Changed" Unchecked="ShowOverlayBox_Changed" />
-        </WrapPanel>
+        <TabControl Grid.Row="2" Margin="0,0,0,0">
+            <TabItem Header="Sessoes">
+                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Padding="10">
+                    <DataGrid x:Name="SessionGrid" AutoGenerateColumns="False" ItemsSource="{Binding Sessions}" SelectionChanged="SessionGrid_SelectionChanged">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="App" Binding="{Binding ProcessName}" Width="180" />
+                            <DataGridTextColumn Header="PID" Binding="{Binding ProcessIdText}" Width="80" />
+                            <DataGridTextColumn Header="Estado" Binding="{Binding State}" Width="90" />
+                            <DataGridTextColumn Header="Volume" Binding="{Binding VolumeText}" Width="80" />
+                            <DataGridTextColumn Header="Sessao" Binding="{Binding SessionText}" Width="*" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Border>
+            </TabItem>
 
-        <DataGrid x:Name="SessionGrid" Grid.Row="3" AutoGenerateColumns="False" ItemsSource="{Binding Sessions}" SelectionChanged="SessionGrid_SelectionChanged">
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="App" Binding="{Binding ProcessName}" Width="180" />
-                <DataGridTextColumn Header="PID" Binding="{Binding ProcessIdText}" Width="80" />
-                <DataGridTextColumn Header="Estado" Binding="{Binding State}" Width="90" />
-                <DataGridTextColumn Header="Volume" Binding="{Binding VolumeText}" Width="80" />
-                <DataGridTextColumn Header="Sessao" Binding="{Binding SessionText}" Width="*" />
-            </DataGrid.Columns>
-        </DataGrid>
+            <TabItem Header="Overlay">
+                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Padding="16">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="190" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="70" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
 
-        <TextBlock x:Name="StatusText" Grid.Row="4" Height="28" VerticalAlignment="Center" Margin="0,10,0,0" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Posicao" VerticalAlignment="Center" Margin="0,0,12,12" />
+                        <ComboBox x:Name="OverlayPositionCombo" Grid.Row="0" Grid.Column="1" Width="240" HorizontalAlignment="Left" Margin="0,0,0,12" SelectionChanged="OverlaySetting_Changed" />
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Tema" VerticalAlignment="Center" Margin="0,0,12,12" />
+                        <ComboBox x:Name="OverlayThemeCombo" Grid.Row="1" Grid.Column="1" Width="180" HorizontalAlignment="Left" Margin="0,0,0,12" SelectionChanged="OverlaySetting_Changed" />
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Largura" VerticalAlignment="Center" Margin="0,0,12,12" />
+                        <Slider x:Name="OverlayWidthSlider" Grid.Row="2" Grid.Column="1" Minimum="340" Maximum="620" TickFrequency="10" IsSnapToTickEnabled="True" ValueChanged="OverlaySlider_Changed" Margin="0,0,12,12" />
+                        <TextBlock x:Name="OverlayWidthValueText" Grid.Row="2" Grid.Column="2" TextAlignment="Right" VerticalAlignment="Center" Margin="0,0,0,12" />
+
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Duracao" VerticalAlignment="Center" Margin="0,0,12,12" />
+                        <Slider x:Name="OverlayDurationSlider" Grid.Row="3" Grid.Column="1" Minimum="600" Maximum="5000" TickFrequency="100" IsSnapToTickEnabled="True" ValueChanged="OverlaySlider_Changed" Margin="0,0,12,12" />
+                        <TextBlock x:Name="OverlayDurationValueText" Grid.Row="3" Grid.Column="2" TextAlignment="Right" VerticalAlignment="Center" Margin="0,0,0,12" />
+
+                        <CheckBox x:Name="ShowOverlayBox" Grid.Row="4" Grid.Column="0" Content="Mostrar overlay de volume" Checked="ShowOverlayBox_Changed" Unchecked="ShowOverlayBox_Changed" />
+                        <CheckBox x:Name="OverlayArtworkBox" Grid.Row="4" Grid.Column="1" Content="Mostrar capa da musica" Checked="OverlaySetting_Changed" Unchecked="OverlaySetting_Changed" />
+                    </Grid>
+                </Border>
+            </TabItem>
+
+            <TabItem Header="Atalhos">
+                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Padding="16">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="170" />
+                            <ColumnDefinition Width="170" />
+                            <ColumnDefinition Width="50" />
+                            <ColumnDefinition Width="170" />
+                            <ColumnDefinition Width="170" />
+                            <ColumnDefinition Width="50" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Diminuir volume" VerticalAlignment="Center" Margin="0,0,12,12" />
+                        <Button x:Name="VolumeDownShortcutButton" Grid.Row="0" Grid.Column="1" MinWidth="140" Margin="0,0,6,12" Click="ShortcutRecordButton_Click" />
+                        <Button x:Name="VolumeDownShortcutResetButton" Grid.Row="0" Grid.Column="2" Style="{StaticResource IconButtonStyle}" Content="↺" ToolTip="Restaurar atalho" Margin="0,0,18,12" Click="ShortcutResetButton_Click" />
+                        <TextBlock Grid.Row="0" Grid.Column="3" Text="Aumentar volume" VerticalAlignment="Center" Margin="0,0,12,12" />
+                        <Button x:Name="VolumeUpShortcutButton" Grid.Row="0" Grid.Column="4" MinWidth="140" Margin="0,0,6,12" Click="ShortcutRecordButton_Click" />
+                        <Button x:Name="VolumeUpShortcutResetButton" Grid.Row="0" Grid.Column="5" Style="{StaticResource IconButtonStyle}" Content="↺" ToolTip="Restaurar atalho" Margin="0,0,0,12" Click="ShortcutResetButton_Click" />
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Mute" VerticalAlignment="Center" Margin="0,0,12,12" />
+                        <Button x:Name="MuteShortcutButton" Grid.Row="1" Grid.Column="1" MinWidth="140" Margin="0,0,6,12" Click="ShortcutRecordButton_Click" />
+                        <Button x:Name="MuteShortcutResetButton" Grid.Row="1" Grid.Column="2" Style="{StaticResource IconButtonStyle}" Content="↺" ToolTip="Restaurar atalho" Margin="0,0,18,12" Click="ShortcutResetButton_Click" />
+                        <TextBlock Grid.Row="1" Grid.Column="3" Text="Mostrar midia" VerticalAlignment="Center" Margin="0,0,12,12" />
+                        <Button x:Name="PeekShortcutButton" Grid.Row="1" Grid.Column="4" MinWidth="140" Margin="0,0,6,12" Click="ShortcutRecordButton_Click" />
+                        <Button x:Name="PeekShortcutResetButton" Grid.Row="1" Grid.Column="5" Style="{StaticResource IconButtonStyle}" Content="↺" ToolTip="Restaurar atalho" Margin="0,0,0,12" Click="ShortcutResetButton_Click" />
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Midia anterior" VerticalAlignment="Center" Margin="0,0,12,12" />
+                        <Button x:Name="PreviousShortcutButton" Grid.Row="2" Grid.Column="1" MinWidth="140" Margin="0,0,6,12" Click="ShortcutRecordButton_Click" />
+                        <Button x:Name="PreviousShortcutResetButton" Grid.Row="2" Grid.Column="2" Style="{StaticResource IconButtonStyle}" Content="↺" ToolTip="Restaurar atalho" Margin="0,0,18,12" Click="ShortcutResetButton_Click" />
+                        <TextBlock Grid.Row="2" Grid.Column="3" Text="Proxima midia" VerticalAlignment="Center" Margin="0,0,12,12" />
+                        <Button x:Name="NextShortcutButton" Grid.Row="2" Grid.Column="4" MinWidth="140" Margin="0,0,6,12" Click="ShortcutRecordButton_Click" />
+                        <Button x:Name="NextShortcutResetButton" Grid.Row="2" Grid.Column="5" Style="{StaticResource IconButtonStyle}" Content="↺" ToolTip="Restaurar atalho" Margin="0,0,0,12" Click="ShortcutResetButton_Click" />
+
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Play/Pause" VerticalAlignment="Center" Margin="0,0,12,12" />
+                        <Button x:Name="PlayPauseShortcutButton" Grid.Row="3" Grid.Column="1" MinWidth="140" Margin="0,0,6,12" Click="ShortcutRecordButton_Click" />
+                        <Button x:Name="PlayPauseShortcutResetButton" Grid.Row="3" Grid.Column="2" Style="{StaticResource IconButtonStyle}" Content="↺" ToolTip="Restaurar atalho" Margin="0,0,18,12" Click="ShortcutResetButton_Click" />
+                        <TextBlock Grid.Row="3" Grid.Column="3" Text="Parar midia" VerticalAlignment="Center" Margin="0,0,12,12" />
+                        <Button x:Name="StopShortcutButton" Grid.Row="3" Grid.Column="4" MinWidth="140" Margin="0,0,6,12" Click="ShortcutRecordButton_Click" />
+                        <Button x:Name="StopShortcutResetButton" Grid.Row="3" Grid.Column="5" Style="{StaticResource IconButtonStyle}" Content="↺" ToolTip="Restaurar atalho" Margin="0,0,0,12" Click="ShortcutResetButton_Click" />
+
+                        <CheckBox x:Name="ShowMediaKeysOverlayBox" Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="3" Content="Mostrar overlay nas teclas de midia" Checked="ShortcutSetting_Changed" Unchecked="ShortcutSetting_Changed" />
+                        <Button Grid.Row="4" Grid.Column="4" Grid.ColumnSpan="2" Content="Redefinir todos" HorizontalAlignment="Right" Click="ResetShortcutsButton_Click" />
+                    </Grid>
+                </Border>
+            </TabItem>
+
+            <TabItem Header="Perfis">
+                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Padding="16">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="160" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Nome do perfil" VerticalAlignment="Center" Margin="0,0,12,12" />
+                        <TextBox x:Name="ProfileNameBox" Grid.Row="0" Grid.Column="1" Margin="0,0,10,12" />
+                        <Button Grid.Row="0" Grid.Column="2" Content="Salvar" Margin="0,0,10,12" Click="SaveProfileButton_Click" />
+                        <Button Grid.Row="0" Grid.Column="3" Content="Novo perfil" Margin="0,0,10,12" Click="NewProfileButton_Click" />
+                        <Button Grid.Row="0" Grid.Column="4" Content="Excluir perfil" Margin="0,0,0,12" Click="DeleteProfileButton_Click" />
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="5" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap"
+                                   Text="Cada perfil guarda alvo, dispositivo, passo e atalhos." />
+                    </Grid>
+                </Border>
+            </TabItem>
+
+            <TabItem Header="Sistema">
+                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Padding="16">
+                    <WrapPanel>
+                        <CheckBox x:Name="StartWithWindowsBox" Content="Iniciar com Windows" Checked="StartWithWindowsBox_Changed" Unchecked="StartWithWindowsBox_Changed" />
+                        <CheckBox x:Name="MinimizeToTrayBox" Content="Minimizar para tray" Checked="MinimizeToTrayBox_Changed" Unchecked="MinimizeToTrayBox_Changed" />
+                        <CheckBox x:Name="StartMinimizedBox" Content="Iniciar minimizado com Windows" Checked="StartMinimizedBox_Changed" Unchecked="StartMinimizedBox_Changed" />
+                    </WrapPanel>
+                </Border>
+            </TabItem>
+        </TabControl>
+
+        <TextBlock x:Name="StatusText" Grid.Row="3" Height="28" VerticalAlignment="Center" Margin="0,10,0,0" TextTrimming="CharacterEllipsis" />
     </Grid>
 </Window>

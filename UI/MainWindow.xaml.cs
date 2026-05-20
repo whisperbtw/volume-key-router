@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Runtime.Versioning;
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -16,6 +17,7 @@ namespace VolumeKeyRouter;
 [SupportedOSPlatform("windows")]
 public sealed partial class MainWindow : Window
 {
+    private const uint KeyEventKeyUp = 0x0002;
     private static readonly TimeSpan[] PeekMediaProbeDelays = { TimeSpan.Zero };
     private static readonly TimeSpan[] PlaybackMediaProbeDelays =
     {
@@ -40,10 +42,14 @@ public sealed partial class MainWindow : Window
     private readonly object targetGate = new();
     private readonly object applyGate = new();
     private readonly object mediaCacheGate = new();
+    private readonly object shortcutGate = new();
     private readonly Forms.NotifyIcon trayIcon = new();
     private readonly Forms.ContextMenuStrip trayMenu = new();
     private readonly Forms.ToolStripMenuItem trayToggleCaptureItem = new();
     private readonly Forms.ToolStripMenuItem trayShowItem = new();
+    private readonly Forms.ToolStripMenuItem trayShowOverlayItem = new();
+    private readonly Forms.ToolStripMenuItem trayRefreshItem = new();
+    private readonly Forms.ToolStripMenuItem trayProfilesItem = new();
     private readonly Drawing.Icon appIcon;
     private readonly VolumeOverlayWindow volumeOverlay = new();
     private readonly DispatcherTimer savedTargetSearchTimer = new()
@@ -56,6 +62,7 @@ public sealed partial class MainWindow : Window
     private bool captureActive;
     private bool refreshing;
     private bool suppressSettingsSave = true;
+    private bool suppressProfileSelectionChange;
     private bool restoringSavedTarget;
     private bool suppressSavedTargetCancel;
     private bool runtimeInitialized;
@@ -65,6 +72,25 @@ public sealed partial class MainWindow : Window
     private MediaTrackInfo? cachedMediaTrack;
     private DateTime cachedMediaTrackUtc;
     private DateTime lastMediaLookupUtc;
+    private ShortcutSettings shortcutSnapshot = new();
+    private System.Windows.Controls.Button? recordingShortcutButton;
+    private volatile bool shortcutRecordingActive;
+
+    private static readonly OverlayOption<OverlayPosition>[] OverlayPositionOptions =
+    {
+        new(OverlayPosition.BottomCenter, "Inferior central"),
+        new(OverlayPosition.BottomRight, "Inferior direita"),
+        new(OverlayPosition.BottomLeft, "Inferior esquerda"),
+        new(OverlayPosition.TopCenter, "Superior central"),
+        new(OverlayPosition.TopRight, "Superior direita"),
+        new(OverlayPosition.TopLeft, "Superior esquerda")
+    };
+
+    private static readonly OverlayOption<OverlayTheme>[] OverlayThemeOptions =
+    {
+        new(OverlayTheme.Dark, "Escuro"),
+        new(OverlayTheme.Light, "Claro")
+    };
 
     public ObservableCollection<SessionRow> Sessions { get; } = new();
 
@@ -79,6 +105,12 @@ public sealed partial class MainWindow : Window
         InitializeComponent();
         DataContext = this;
         Icon = Imaging.CreateBitmapSourceFromHIcon(appIcon.Handle, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+        PreviewKeyDown += MainWindow_PreviewKeyDown;
+        Deactivated += (_, _) => CancelShortcutRecording();
+        InitializeOptionControls();
+        RefreshProfileControls();
+        UpdateShortcutSnapshot();
+        volumeOverlay.Configure(settings.Overlay);
 
         if (startHiddenToTray)
         {
@@ -222,12 +254,19 @@ public sealed partial class MainWindow : Window
         return IntPtr.Zero;
     }
 
+    private void InitializeOptionControls()
+    {
+        OverlayPositionCombo.ItemsSource = OverlayPositionOptions;
+        OverlayThemeCombo.ItemsSource = OverlayThemeOptions;
+    }
+
     private void ApplySettingsToControls()
     {
         var previousSuppressSettingsSave = suppressSettingsSave;
         suppressSettingsSave = true;
         try
         {
+            RefreshProfileControls();
             AppModeButton.IsChecked = settings.TargetMode != TargetMode.Device;
             DeviceModeButton.IsChecked = settings.TargetMode == TargetMode.Device;
             StepSlider.Value = Math.Clamp(settings.StepPercent, (int)StepSlider.Minimum, (int)StepSlider.Maximum);
@@ -241,11 +280,395 @@ public sealed partial class MainWindow : Window
             MinimizeToTrayBox.IsChecked = settings.MinimizeToTray;
             StartMinimizedBox.IsChecked = settings.StartMinimized;
             ShowOverlayBox.IsChecked = settings.ShowVolumeOverlay;
+            ApplyOverlaySettingsToControls();
+            ApplyShortcutSettingsToControls();
         }
         finally
         {
             suppressSettingsSave = previousSuppressSettingsSave;
         }
+
+        volumeOverlay.Configure(settings.Overlay);
+        UpdateShortcutSnapshot();
+    }
+
+    private void RefreshProfileControls()
+    {
+        if (ProfileCombo is null || ProfileNameBox is null)
+        {
+            return;
+        }
+
+        var previousSuppress = suppressProfileSelectionChange;
+        suppressProfileSelectionChange = true;
+        try
+        {
+            ProfileCombo.ItemsSource = null;
+            ProfileCombo.ItemsSource = settings.Profiles;
+            ProfileCombo.SelectedItem = settings.ActiveProfile;
+            ProfileNameBox.Text = settings.ActiveProfile?.Name ?? string.Empty;
+        }
+        finally
+        {
+            suppressProfileSelectionChange = previousSuppress;
+        }
+
+        UpdateTrayMenu();
+    }
+
+    private void ApplyOverlaySettingsToControls()
+    {
+        SelectOverlayOption(OverlayPositionCombo, OverlayPositionOptions, settings.Overlay.Position);
+        SelectOverlayOption(OverlayThemeCombo, OverlayThemeOptions, settings.Overlay.Theme);
+        OverlayWidthSlider.Value = settings.Overlay.Width;
+        OverlayDurationSlider.Value = settings.Overlay.DurationMs;
+        OverlayArtworkBox.IsChecked = settings.Overlay.ShowArtwork;
+        UpdateOverlayValueLabels();
+    }
+
+    private void ApplyShortcutSettingsToControls()
+    {
+        SetShortcutButton(VolumeDownShortcutButton, settings.Shortcuts.VolumeDown);
+        SetShortcutButton(VolumeUpShortcutButton, settings.Shortcuts.VolumeUp);
+        SetShortcutButton(MuteShortcutButton, settings.Shortcuts.Mute);
+        SetShortcutButton(PeekShortcutButton, settings.Shortcuts.PeekMedia);
+        SetShortcutButton(PreviousShortcutButton, settings.Shortcuts.PreviousTrack);
+        SetShortcutButton(NextShortcutButton, settings.Shortcuts.NextTrack);
+        SetShortcutButton(PlayPauseShortcutButton, settings.Shortcuts.PlayPause);
+        SetShortcutButton(StopShortcutButton, settings.Shortcuts.Stop);
+        ShowMediaKeysOverlayBox.IsChecked = settings.Shortcuts.ShowOverlayOnMediaKeys;
+    }
+
+    private void CopyOverlayControlsToSettings()
+    {
+        settings.Overlay.Position = GetSelectedOverlayValue(
+            OverlayPositionCombo,
+            OverlayPositionOptions,
+            OverlayPosition.BottomCenter);
+        settings.Overlay.Theme = GetSelectedOverlayValue(
+            OverlayThemeCombo,
+            OverlayThemeOptions,
+            OverlayTheme.Dark);
+        settings.Overlay.Width = Math.Clamp((int)Math.Round(OverlayWidthSlider.Value), 340, 620);
+        settings.Overlay.DurationMs = Math.Clamp((int)Math.Round(OverlayDurationSlider.Value), 600, 5000);
+        settings.Overlay.ShowArtwork = OverlayArtworkBox.IsChecked == true;
+        settings.Overlay.Normalize();
+    }
+
+    private void CopyShortcutControlsToSettings()
+    {
+        settings.Shortcuts.ApplyVolumeDown(GetSelectedShortcut(
+            VolumeDownShortcutButton,
+            KeyboardShortcutKeys.VolumeDown));
+        settings.Shortcuts.ApplyVolumeUp(GetSelectedShortcut(
+            VolumeUpShortcutButton,
+            KeyboardShortcutKeys.VolumeUp));
+        settings.Shortcuts.ApplyMute(GetSelectedShortcut(
+            MuteShortcutButton,
+            KeyboardShortcutKeys.VolumeMute));
+        settings.Shortcuts.ApplyPeekMedia(GetSelectedShortcut(
+            PeekShortcutButton,
+            KeyboardShortcutKeys.LaunchMediaSelect));
+        settings.Shortcuts.ApplyPreviousTrack(GetSelectedShortcut(
+            PreviousShortcutButton,
+            KeyboardShortcutKeys.MediaPreviousTrack));
+        settings.Shortcuts.ApplyNextTrack(GetSelectedShortcut(
+            NextShortcutButton,
+            KeyboardShortcutKeys.MediaNextTrack));
+        settings.Shortcuts.ApplyPlayPause(GetSelectedShortcut(
+            PlayPauseShortcutButton,
+            KeyboardShortcutKeys.MediaPlayPause));
+        settings.Shortcuts.ApplyStop(GetSelectedShortcut(
+            StopShortcutButton,
+            KeyboardShortcutKeys.MediaStop));
+        settings.Shortcuts.ShowOverlayOnMediaKeys = ShowMediaKeysOverlayBox.IsChecked == true;
+        settings.Shortcuts.Normalize();
+        UpdateShortcutSnapshot();
+    }
+
+    private void UpdateOverlayValueLabels()
+    {
+        if (OverlayWidthValueText is not null && OverlayWidthSlider is not null)
+        {
+            OverlayWidthValueText.Text = $"{Math.Round(OverlayWidthSlider.Value)}px";
+        }
+
+        if (OverlayDurationValueText is not null && OverlayDurationSlider is not null)
+        {
+            OverlayDurationValueText.Text = $"{Math.Round(OverlayDurationSlider.Value) / 1000:0.0}s";
+        }
+    }
+
+    private void UpdateShortcutSnapshot()
+    {
+        lock (shortcutGate)
+        {
+            shortcutSnapshot = settings.Shortcuts.Clone();
+        }
+    }
+
+    private ShortcutSettings GetShortcutSettings()
+    {
+        lock (shortcutGate)
+        {
+            return shortcutSnapshot.Clone();
+        }
+    }
+
+    private void SetShortcutButton(System.Windows.Controls.Button button, ShortcutBinding binding)
+    {
+        var normalized = binding.Normalize(KeyboardShortcutKeys.None);
+        button.Tag = normalized;
+        button.Content = KeyboardShortcutKeys.GetDisplayName(normalized);
+    }
+
+    private ShortcutBinding GetSelectedShortcut(System.Windows.Controls.Button button, int fallback)
+    {
+        return button.Tag is ShortcutBinding binding
+            ? binding.Normalize(fallback)
+            : new ShortcutBinding(fallback, ShortcutModifiers.None);
+    }
+
+    private static void SelectOverlayOption<T>(
+        System.Windows.Controls.ComboBox combo,
+        IReadOnlyList<OverlayOption<T>> options,
+        T value)
+        where T : struct, Enum
+    {
+        combo.SelectedItem = options.FirstOrDefault(option => EqualityComparer<T>.Default.Equals(option.Value, value))
+            ?? options.First();
+    }
+
+    private static T GetSelectedOverlayValue<T>(
+        System.Windows.Controls.ComboBox combo,
+        IReadOnlyList<OverlayOption<T>> options,
+        T fallback)
+        where T : struct, Enum
+    {
+        return combo.SelectedItem is OverlayOption<T> option
+            ? option.Value
+            : options.FirstOrDefault(option => EqualityComparer<T>.Default.Equals(option.Value, fallback))?.Value ?? fallback;
+    }
+
+    private IEnumerable<System.Windows.Controls.Button> GetShortcutButtons()
+    {
+        yield return VolumeDownShortcutButton;
+        yield return VolumeUpShortcutButton;
+        yield return MuteShortcutButton;
+        yield return PeekShortcutButton;
+        yield return PreviousShortcutButton;
+        yield return NextShortcutButton;
+        yield return PlayPauseShortcutButton;
+        yield return StopShortcutButton;
+    }
+
+    private string? GetShortcutConflictText()
+    {
+        var duplicate = GetShortcutButtons()
+            .Select(button => GetSelectedShortcut(button, KeyboardShortcutKeys.None))
+            .Where(binding => binding.IsConfigured)
+            .GroupBy(binding => binding)
+            .FirstOrDefault(group => group.Count() > 1);
+
+        return duplicate is null
+            ? null
+            : $"Atalho duplicado: {KeyboardShortcutKeys.GetDisplayName(duplicate.Key)}.";
+    }
+
+    private bool TrySaveShortcutButton(System.Windows.Controls.Button button, ShortcutBinding binding, string verb)
+    {
+        var normalized = binding.Normalize(KeyboardShortcutKeys.None);
+        if (TryFindShortcutConflict(button, normalized, out var conflictButton))
+        {
+            SetStatus(
+                $"Atalho ja usado em {GetShortcutButtonLabel(conflictButton)}: {KeyboardShortcutKeys.GetDisplayName(normalized)}.");
+            return false;
+        }
+
+        SetShortcutButton(button, normalized);
+        CopyShortcutControlsToSettings();
+        SaveSettings();
+        SetStatus($"{verb}: {KeyboardShortcutKeys.GetDisplayName(normalized)}.");
+        return true;
+    }
+
+    private bool TryFindShortcutConflict(
+        System.Windows.Controls.Button targetButton,
+        ShortcutBinding binding,
+        out System.Windows.Controls.Button conflictButton)
+    {
+        conflictButton = null!;
+        if (!binding.IsConfigured)
+        {
+            return false;
+        }
+
+        foreach (var button in GetShortcutButtons())
+        {
+            if (ReferenceEquals(button, targetButton))
+            {
+                continue;
+            }
+
+            if (GetSelectedShortcut(button, KeyboardShortcutKeys.None) == binding)
+            {
+                conflictButton = button;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string GetShortcutButtonLabel(System.Windows.Controls.Button button)
+    {
+        return button.Name switch
+        {
+            "VolumeDownShortcutButton" => "Diminuir volume",
+            "VolumeUpShortcutButton" => "Aumentar volume",
+            "MuteShortcutButton" => "Mute",
+            "PeekShortcutButton" => "Mostrar midia",
+            "PreviousShortcutButton" => "Midia anterior",
+            "NextShortcutButton" => "Proxima midia",
+            "PlayPauseShortcutButton" => "Play/Pause",
+            "StopShortcutButton" => "Parar midia",
+            _ => "outro atalho"
+        };
+    }
+
+    private void BeginShortcutRecording(System.Windows.Controls.Button button)
+    {
+        CancelShortcutRecording();
+        recordingShortcutButton = button;
+        shortcutRecordingActive = true;
+        button.Content = "Pressione a combinacao";
+        button.Focus();
+        Keyboard.Focus(button);
+        SetStatus("Pressione a combinacao desejada. Esc cancela; Backspace desativa.");
+    }
+
+    private void CompleteShortcutRecording(ShortcutBinding binding)
+    {
+        var button = recordingShortcutButton;
+        if (button is null)
+        {
+            return;
+        }
+
+        recordingShortcutButton = null;
+        shortcutRecordingActive = false;
+        if (!TrySaveShortcutButton(button, binding, "Atalho gravado"))
+        {
+            button.Content = KeyboardShortcutKeys.GetDisplayName(GetSelectedShortcut(button, KeyboardShortcutKeys.None));
+        }
+    }
+
+    private void CancelShortcutRecording()
+    {
+        if (recordingShortcutButton is null)
+        {
+            return;
+        }
+
+        var button = recordingShortcutButton;
+        recordingShortcutButton = null;
+        shortcutRecordingActive = false;
+        button.Content = KeyboardShortcutKeys.GetDisplayName(GetSelectedShortcut(button, KeyboardShortcutKeys.None));
+    }
+
+    private void MainWindow_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (recordingShortcutButton is null)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        var key = GetPressedKey(e);
+        if (key == Key.Escape)
+        {
+            CancelShortcutRecording();
+            SetStatus("Gravacao de atalho cancelada.");
+            return;
+        }
+
+        if (key is Key.Back or Key.Delete)
+        {
+            CompleteShortcutRecording(new ShortcutBinding(KeyboardShortcutKeys.None, ShortcutModifiers.None));
+            return;
+        }
+
+        if (IsModifierKey(key))
+        {
+            SetStatus("Escolha uma tecla que nao seja apenas Ctrl, Shift, Alt ou Win.");
+            return;
+        }
+
+        var virtualKeyCode = KeyInterop.VirtualKeyFromKey(key);
+        if (virtualKeyCode <= 0)
+        {
+            SetStatus("Nao consegui reconhecer essa tecla.");
+            return;
+        }
+
+        CompleteShortcutRecording(new ShortcutBinding(
+            virtualKeyCode,
+            GetCurrentWpfShortcutModifiers()));
+    }
+
+    private static Key GetPressedKey(System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == Key.System)
+        {
+            return e.SystemKey;
+        }
+
+        if (e.Key == Key.ImeProcessed)
+        {
+            return e.ImeProcessedKey;
+        }
+
+        if (e.Key == Key.DeadCharProcessed)
+        {
+            return e.DeadCharProcessedKey;
+        }
+
+        return e.Key;
+    }
+
+    private static bool IsModifierKey(Key key)
+    {
+        return key is Key.LeftCtrl or Key.RightCtrl or
+            Key.LeftShift or Key.RightShift or
+            Key.LeftAlt or Key.RightAlt or
+            Key.LWin or Key.RWin;
+    }
+
+    private static ShortcutModifiers GetCurrentWpfShortcutModifiers()
+    {
+        var modifiers = ShortcutModifiers.None;
+        var wpfModifiers = Keyboard.Modifiers;
+        if (wpfModifiers.HasFlag(ModifierKeys.Control))
+        {
+            modifiers |= ShortcutModifiers.Control;
+        }
+
+        if (wpfModifiers.HasFlag(ModifierKeys.Shift))
+        {
+            modifiers |= ShortcutModifiers.Shift;
+        }
+
+        if (wpfModifiers.HasFlag(ModifierKeys.Alt))
+        {
+            modifiers |= ShortcutModifiers.Alt;
+        }
+
+        if (wpfModifiers.HasFlag(ModifierKeys.Windows))
+        {
+            modifiers |= ShortcutModifiers.Win;
+        }
+
+        return modifiers;
     }
 
     private void RefreshDevices(bool restoreSavedTarget = false)
@@ -359,7 +782,7 @@ public sealed partial class MainWindow : Window
 
         try
         {
-            hook = new VolumeKeyHook(HandleVolumeKey, HasValidTarget, HandleMediaKey);
+            hook = new VolumeKeyHook(HandleVolumeKey, HasValidTarget, HandleMediaKey, GetShortcutSettings);
             hook.Install();
             captureActive = true;
             UpdateCaptureButton();
@@ -369,7 +792,7 @@ public sealed partial class MainWindow : Window
                 SaveSettings();
             }
 
-            SetStatus("Captura ativa. Fn+F1 mostra a midia; Fn+F2/F3 controla o alvo.");
+            SetStatus("Captura ativa. Os atalhos configurados estao controlando o alvo.");
         }
         catch (Exception ex)
         {
@@ -404,6 +827,11 @@ public sealed partial class MainWindow : Window
 
     private bool HandleVolumeKey(VolumeCommand command)
     {
+        if (shortcutRecordingActive)
+        {
+            return false;
+        }
+
         var snapshot = GetTargetSnapshot();
         if (!snapshot.IsValid)
         {
@@ -473,8 +901,38 @@ public sealed partial class MainWindow : Window
 
     private bool HandleMediaKey(MediaKeyCommand command)
     {
-        _ = ShowCurrentMediaOverlayAfterManualMediaKeyAsync(command);
-        return command == MediaKeyCommand.Peek;
+        if (shortcutRecordingActive)
+        {
+            return false;
+        }
+
+        SendMediaKeyToWindows(command);
+        if (command == MediaKeyCommand.Peek || GetShortcutSettings().ShowOverlayOnMediaKeys)
+        {
+            _ = ShowCurrentMediaOverlayAfterManualMediaKeyAsync(command);
+        }
+
+        return true;
+    }
+
+    private static void SendMediaKeyToWindows(MediaKeyCommand command)
+    {
+        var virtualKeyCode = command switch
+        {
+            MediaKeyCommand.PreviousTrack => KeyboardShortcutKeys.MediaPreviousTrack,
+            MediaKeyCommand.NextTrack => KeyboardShortcutKeys.MediaNextTrack,
+            MediaKeyCommand.PlayPause => KeyboardShortcutKeys.MediaPlayPause,
+            MediaKeyCommand.Stop => KeyboardShortcutKeys.MediaStop,
+            _ => KeyboardShortcutKeys.None
+        };
+
+        if (virtualKeyCode == KeyboardShortcutKeys.None)
+        {
+            return;
+        }
+
+        NativeMethods.keybd_event((byte)virtualKeyCode, 0, 0, NativeMethods.VolumeKeyRouterInjectedKeyExtraInfo);
+        NativeMethods.keybd_event((byte)virtualKeyCode, 0, KeyEventKeyUp, NativeMethods.VolumeKeyRouterInjectedKeyExtraInfo);
     }
 
     private async Task UpdateOverlayMediaInfoAsync(string preferredTarget, VolumeAdjustmentResult result, long requestId)
@@ -1077,19 +1535,30 @@ public sealed partial class MainWindow : Window
         trayShowItem.Text = "Abrir";
         trayShowItem.Click += (_, _) => BeginInvokeSafe(RestoreFromTray);
 
+        trayShowOverlayItem.Text = "Mostrar overlay agora";
+        trayShowOverlayItem.Click += (_, _) => BeginInvokeSafe(() =>
+        {
+            _ = ShowCurrentMediaOverlayAsync(force: true, honorOverlaySetting: false);
+        });
+
         trayToggleCaptureItem.Click += (_, _) => BeginInvokeSafe(ToggleCapture);
 
-        var refreshItem = new Forms.ToolStripMenuItem("Atualizar", null, (_, _) => BeginInvokeSafe(() =>
+        trayRefreshItem.Text = "Recarregar dispositivos";
+        trayRefreshItem.Click += (_, _) => BeginInvokeSafe(() =>
         {
             RestoreFromTray();
             RefreshDevices();
-        }));
+        });
+
+        trayProfilesItem.Text = "Perfis";
 
         var exitItem = new Forms.ToolStripMenuItem("Sair", null, (_, _) => BeginInvokeSafe(ExitApplication));
 
         trayMenu.Items.Add(trayShowItem);
+        trayMenu.Items.Add(trayShowOverlayItem);
         trayMenu.Items.Add(trayToggleCaptureItem);
-        trayMenu.Items.Add(refreshItem);
+        trayMenu.Items.Add(trayRefreshItem);
+        trayMenu.Items.Add(trayProfilesItem);
         trayMenu.Items.Add(new Forms.ToolStripSeparator());
         trayMenu.Items.Add(exitItem);
 
@@ -1157,8 +1626,21 @@ public sealed partial class MainWindow : Window
 
     private void UpdateTrayMenu()
     {
-        trayToggleCaptureItem.Text = captureActive ? "Pausar captura" : "Ativar captura";
+        trayToggleCaptureItem.Text = captureActive ? "Pausar roteamento" : "Ativar roteamento";
         trayShowItem.Text = IsVisible && WindowState != WindowState.Minimized ? "Abrir" : "Mostrar janela";
+        trayProfilesItem.DropDownItems.Clear();
+
+        foreach (var profile in settings.Profiles)
+        {
+            var item = new Forms.ToolStripMenuItem(profile.Name)
+            {
+                Checked = profile.Id == settings.ActiveProfileId
+            };
+            item.Click += (_, _) => BeginInvokeSafe(() => ActivateProfile(profile.Id));
+            trayProfilesItem.DropDownItems.Add(item);
+        }
+
+        trayProfilesItem.Enabled = trayProfilesItem.DropDownItems.Count > 0;
     }
 
     private void UpdateStepValueLabel()
@@ -1220,6 +1702,9 @@ public sealed partial class MainWindow : Window
         settings.StartMinimized = StartMinimizedBox.IsChecked == true;
         settings.StartWithWindows = StartWithWindowsBox.IsChecked == true;
         settings.ShowVolumeOverlay = ShowOverlayBox.IsChecked == true;
+        CopyOverlayControlsToSettings();
+        CopyShortcutControlsToSettings();
+        settings.UpdateActiveProfileFromCurrent();
     }
 
     private void BeginInvokeSafe(Action action)
@@ -1354,9 +1839,226 @@ public sealed partial class MainWindow : Window
         SaveSettings();
     }
 
+    private void OverlaySetting_Changed(object sender, RoutedEventArgs e)
+    {
+        if (suppressSettingsSave)
+        {
+            return;
+        }
+
+        CopyOverlayControlsToSettings();
+        volumeOverlay.Configure(settings.Overlay);
+        SaveSettings();
+        SetStatus("Overlay atualizado.");
+    }
+
+    private void OverlaySlider_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        UpdateOverlayValueLabels();
+        if (suppressSettingsSave)
+        {
+            return;
+        }
+
+        CopyOverlayControlsToSettings();
+        volumeOverlay.Configure(settings.Overlay);
+        SaveSettings();
+    }
+
+    private void ShortcutRecordButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is System.Windows.Controls.Button button)
+        {
+            BeginShortcutRecording(button);
+        }
+    }
+
+    private void ShortcutResetButton_Click(object sender, RoutedEventArgs e)
+    {
+        CancelShortcutRecording();
+        if (sender is not FrameworkElement element ||
+            TryGetShortcutResetTarget(element.Name) is not { } resetTarget)
+        {
+            return;
+        }
+
+        TrySaveShortcutButton(resetTarget.Button, resetTarget.Binding, "Atalho restaurado");
+    }
+
+    private void ShortcutSetting_Changed(object sender, RoutedEventArgs e)
+    {
+        if (suppressSettingsSave)
+        {
+            return;
+        }
+
+        CopyShortcutControlsToSettings();
+        SaveSettings();
+        SetStatus(GetShortcutConflictText() ?? "Atalhos atualizados.");
+    }
+
+    private void ResetShortcutsButton_Click(object sender, RoutedEventArgs e)
+    {
+        CancelShortcutRecording();
+        settings.Shortcuts = new ShortcutSettings();
+        settings.Shortcuts.Normalize();
+
+        var previousSuppress = suppressSettingsSave;
+        suppressSettingsSave = true;
+        try
+        {
+            ApplyShortcutSettingsToControls();
+        }
+        finally
+        {
+            suppressSettingsSave = previousSuppress;
+        }
+
+        UpdateShortcutSnapshot();
+        SaveSettings();
+        SetStatus("Atalhos restaurados.");
+    }
+
+    private (System.Windows.Controls.Button Button, ShortcutBinding Binding)? TryGetShortcutResetTarget(string resetButtonName)
+    {
+        return resetButtonName switch
+        {
+            nameof(VolumeDownShortcutResetButton) => (
+                VolumeDownShortcutButton,
+                new ShortcutBinding(KeyboardShortcutKeys.VolumeDown, ShortcutModifiers.None)),
+            nameof(VolumeUpShortcutResetButton) => (
+                VolumeUpShortcutButton,
+                new ShortcutBinding(KeyboardShortcutKeys.VolumeUp, ShortcutModifiers.None)),
+            nameof(MuteShortcutResetButton) => (
+                MuteShortcutButton,
+                new ShortcutBinding(KeyboardShortcutKeys.VolumeMute, ShortcutModifiers.None)),
+            nameof(PeekShortcutResetButton) => (
+                PeekShortcutButton,
+                new ShortcutBinding(KeyboardShortcutKeys.LaunchMediaSelect, ShortcutModifiers.None)),
+            nameof(PreviousShortcutResetButton) => (
+                PreviousShortcutButton,
+                new ShortcutBinding(KeyboardShortcutKeys.MediaPreviousTrack, ShortcutModifiers.None)),
+            nameof(NextShortcutResetButton) => (
+                NextShortcutButton,
+                new ShortcutBinding(KeyboardShortcutKeys.MediaNextTrack, ShortcutModifiers.None)),
+            nameof(PlayPauseShortcutResetButton) => (
+                PlayPauseShortcutButton,
+                new ShortcutBinding(KeyboardShortcutKeys.MediaPlayPause, ShortcutModifiers.None)),
+            nameof(StopShortcutResetButton) => (
+                StopShortcutButton,
+                new ShortcutBinding(KeyboardShortcutKeys.MediaStop, ShortcutModifiers.None)),
+            _ => null
+        };
+    }
+
+    private void ProfileCombo_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (suppressProfileSelectionChange || ProfileCombo.SelectedItem is not ProfileSettings profile)
+        {
+            return;
+        }
+
+        ActivateProfile(profile.Id);
+    }
+
+    private void SaveProfileButton_Click(object sender, RoutedEventArgs e)
+    {
+        var profile = settings.ActiveProfile;
+        if (profile is null)
+        {
+            return;
+        }
+
+        var name = ProfileNameBox.Text.Trim();
+        profile.Name = string.IsNullOrWhiteSpace(name) ? profile.Name : name;
+        SaveSettings();
+        RefreshProfileControls();
+        SetStatus($"Perfil salvo: {profile.Name}.");
+    }
+
+    private void NewProfileButton_Click(object sender, RoutedEventArgs e)
+    {
+        CopyCurrentControlsToSettings();
+        var profile = settings.AddProfileFromCurrent("Novo perfil");
+        settings.Save();
+        RefreshProfileControls();
+        ApplySettingsToControls();
+        SetStatus($"Perfil criado: {profile.Name}.");
+    }
+
+    private void DeleteProfileButton_Click(object sender, RoutedEventArgs e)
+    {
+        var removedName = settings.ActiveProfile?.Name ?? "perfil";
+        if (!settings.RemoveActiveProfile())
+        {
+            SetStatus("Mantenha pelo menos um perfil.");
+            return;
+        }
+
+        ApplySettingsToControls();
+        restoringSavedTarget = HasSavedTarget();
+        suppressSavedTargetCancel = true;
+        try
+        {
+            RefreshDevices(restoringSavedTarget);
+        }
+        finally
+        {
+            suppressSavedTargetCancel = false;
+        }
+
+        settings.Save();
+        RefreshProfileControls();
+        SetStatus($"Perfil excluido: {removedName}.");
+    }
+
+    private void ActivateProfile(string profileId)
+    {
+        var profile = settings.Profiles.FirstOrDefault(candidate => candidate.Id == profileId);
+        if (profile is null || profile.Id == settings.ActiveProfileId)
+        {
+            RefreshProfileControls();
+            return;
+        }
+
+        CopyCurrentControlsToSettings();
+        settings.UpdateActiveProfileFromCurrent();
+        settings.ActiveProfileId = profile.Id;
+        settings.ApplyActiveProfileToCurrent();
+
+        var previousSuppress = suppressSettingsSave;
+        suppressSettingsSave = true;
+        suppressSavedTargetCancel = true;
+        try
+        {
+            ApplySettingsToControls();
+            restoringSavedTarget = HasSavedTarget();
+            RefreshDevices(restoringSavedTarget);
+        }
+        finally
+        {
+            suppressSavedTargetCancel = false;
+            suppressSettingsSave = previousSuppress;
+        }
+
+        settings.Save();
+        UpdateTargetSnapshot();
+        RefreshProfileControls();
+        SetStatus($"Perfil ativo: {profile.Name}.");
+    }
+
     private AudioDeviceInfo? SelectedDevice => DeviceCombo.SelectedItem as AudioDeviceInfo;
 
     private AudioSessionInfo? SelectedSession => SessionGrid is null ? null : (SessionGrid.SelectedItem as SessionRow)?.Info;
+
+    private sealed record OverlayOption<T>(T Value, string DisplayName)
+        where T : struct, Enum
+    {
+        public override string ToString()
+        {
+            return DisplayName;
+        }
+    }
 
     public sealed class SessionRow : INotifyPropertyChanged
     {

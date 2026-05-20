@@ -5,6 +5,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
@@ -41,6 +42,18 @@ internal sealed class AppSettings
 
     public bool ShowVolumeOverlay { get; set; } = true;
 
+    public OverlaySettings Overlay { get; set; } = new();
+
+    public ShortcutSettings Shortcuts { get; set; } = new();
+
+    public string? ActiveProfileId { get; set; }
+
+    public List<ProfileSettings> Profiles { get; set; } = new();
+
+    [JsonIgnore]
+    public ProfileSettings? ActiveProfile =>
+        Profiles.FirstOrDefault(profile => profile.Id == ActiveProfileId) ?? Profiles.FirstOrDefault();
+
     public static AppSettings Load()
     {
         try
@@ -52,12 +65,14 @@ internal sealed class AppSettings
 
             var settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(SettingsPath), JsonOptions)
                 ?? new AppSettings();
-            settings.StepPercent = Math.Clamp(settings.StepPercent, 1, 50);
+            settings.Normalize(applyActiveProfile: true);
             return settings;
         }
         catch
         {
-            return new AppSettings();
+            var settings = new AppSettings();
+            settings.Normalize(applyActiveProfile: true);
+            return settings;
         }
     }
 
@@ -69,13 +84,401 @@ internal sealed class AppSettings
             Directory.CreateDirectory(directory);
         }
 
+        Normalize(applyActiveProfile: false);
         File.WriteAllText(SettingsPath, JsonSerializer.Serialize(this, JsonOptions));
+    }
+
+    public void UpdateActiveProfileFromCurrent()
+    {
+        var profile = ActiveProfile;
+        if (profile is null)
+        {
+            return;
+        }
+
+        profile.LastDeviceId = LastDeviceId;
+        profile.LastDeviceName = LastDeviceName;
+        profile.TargetMode = TargetMode;
+        profile.LastSessionIdentifier = LastSessionIdentifier;
+        profile.LastProcessName = LastProcessName;
+        profile.LastProcessId = LastProcessId;
+        profile.StepPercent = StepPercent;
+        profile.Shortcuts = Shortcuts.Clone();
+        profile.Normalize();
+    }
+
+    public void ApplyActiveProfileToCurrent()
+    {
+        var profile = ActiveProfile;
+        if (profile is null)
+        {
+            return;
+        }
+
+        LastDeviceId = profile.LastDeviceId;
+        LastDeviceName = profile.LastDeviceName;
+        TargetMode = profile.TargetMode;
+        LastSessionIdentifier = profile.LastSessionIdentifier;
+        LastProcessName = profile.LastProcessName;
+        LastProcessId = profile.LastProcessId;
+        StepPercent = profile.StepPercent;
+        Shortcuts = profile.Shortcuts.Clone();
+        Shortcuts.Normalize();
+    }
+
+    public ProfileSettings AddProfileFromCurrent(string name)
+    {
+        Normalize(applyActiveProfile: false);
+        var profile = ProfileSettings.FromCurrent(this, GetUniqueProfileName(name));
+        Profiles.Add(profile);
+        ActiveProfileId = profile.Id;
+        ApplyActiveProfileToCurrent();
+        return profile;
+    }
+
+    public bool RemoveActiveProfile()
+    {
+        var profile = ActiveProfile;
+        if (profile is null || Profiles.Count <= 1)
+        {
+            return false;
+        }
+
+        Profiles.Remove(profile);
+        ActiveProfileId = Profiles.First().Id;
+        ApplyActiveProfileToCurrent();
+        return true;
+    }
+
+    private void Normalize(bool applyActiveProfile)
+    {
+        StepPercent = Math.Clamp(StepPercent, 1, 50);
+        Overlay ??= new OverlaySettings();
+        Overlay.Normalize();
+        Shortcuts ??= new ShortcutSettings();
+        Shortcuts.Normalize();
+        Profiles ??= new List<ProfileSettings>();
+        Profiles.RemoveAll(profile => string.IsNullOrWhiteSpace(profile.Name));
+
+        if (Profiles.Count == 0)
+        {
+            Profiles.Add(ProfileSettings.FromCurrent(this, "Padrao"));
+        }
+
+        foreach (var profile in Profiles)
+        {
+            profile.Normalize();
+        }
+
+        if (Profiles.All(profile => profile.Id != ActiveProfileId))
+        {
+            ActiveProfileId = Profiles.First().Id;
+        }
+
+        if (applyActiveProfile)
+        {
+            ApplyActiveProfileToCurrent();
+        }
+    }
+
+    private string GetUniqueProfileName(string name)
+    {
+        var baseName = string.IsNullOrWhiteSpace(name) ? "Novo perfil" : name.Trim();
+        var candidate = baseName;
+        var suffix = 2;
+        while (Profiles.Any(profile => profile.Name.Equals(candidate, StringComparison.OrdinalIgnoreCase)))
+        {
+            candidate = $"{baseName} {suffix}";
+            suffix++;
+        }
+
+        return candidate;
     }
 
     private static string SettingsPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "volume-key-router",
         "settings.json");
+}
+
+internal sealed class OverlaySettings
+{
+    public OverlayPosition Position { get; set; } = OverlayPosition.BottomCenter;
+
+    public int Width { get; set; } = 430;
+
+    public int DurationMs { get; set; } = 1200;
+
+    public bool ShowArtwork { get; set; } = true;
+
+    public OverlayTheme Theme { get; set; } = OverlayTheme.Dark;
+
+    public void Normalize()
+    {
+        Width = Math.Clamp(Width, 340, 620);
+        DurationMs = Math.Clamp(DurationMs, 600, 5000);
+        if (!Enum.IsDefined(Position))
+        {
+            Position = OverlayPosition.BottomCenter;
+        }
+
+        if (!Enum.IsDefined(Theme))
+        {
+            Theme = OverlayTheme.Dark;
+        }
+    }
+
+    public OverlaySettings Clone()
+    {
+        return new OverlaySettings
+        {
+            Position = Position,
+            Width = Width,
+            DurationMs = DurationMs,
+            ShowArtwork = ShowArtwork,
+            Theme = Theme
+        };
+    }
+}
+
+internal sealed class ShortcutSettings
+{
+    public int VolumeDownKey { get; set; } = KeyboardShortcutKeys.VolumeDown;
+
+    public ShortcutModifiers VolumeDownModifiers { get; set; } = ShortcutModifiers.None;
+
+    public int VolumeUpKey { get; set; } = KeyboardShortcutKeys.VolumeUp;
+
+    public ShortcutModifiers VolumeUpModifiers { get; set; } = ShortcutModifiers.None;
+
+    public int MuteKey { get; set; } = KeyboardShortcutKeys.VolumeMute;
+
+    public ShortcutModifiers MuteModifiers { get; set; } = ShortcutModifiers.None;
+
+    public int PeekMediaKey { get; set; } = KeyboardShortcutKeys.LaunchMediaSelect;
+
+    public ShortcutModifiers PeekMediaModifiers { get; set; } = ShortcutModifiers.None;
+
+    public int PreviousTrackKey { get; set; } = KeyboardShortcutKeys.MediaPreviousTrack;
+
+    public ShortcutModifiers PreviousTrackModifiers { get; set; } = ShortcutModifiers.None;
+
+    public int NextTrackKey { get; set; } = KeyboardShortcutKeys.MediaNextTrack;
+
+    public ShortcutModifiers NextTrackModifiers { get; set; } = ShortcutModifiers.None;
+
+    public int PlayPauseKey { get; set; } = KeyboardShortcutKeys.MediaPlayPause;
+
+    public ShortcutModifiers PlayPauseModifiers { get; set; } = ShortcutModifiers.None;
+
+    public int StopKey { get; set; } = KeyboardShortcutKeys.MediaStop;
+
+    public ShortcutModifiers StopModifiers { get; set; } = ShortcutModifiers.None;
+
+    public bool ShowOverlayOnMediaKeys { get; set; } = true;
+
+    [JsonIgnore]
+    public ShortcutBinding VolumeDown => new(VolumeDownKey, VolumeDownModifiers);
+
+    [JsonIgnore]
+    public ShortcutBinding VolumeUp => new(VolumeUpKey, VolumeUpModifiers);
+
+    [JsonIgnore]
+    public ShortcutBinding Mute => new(MuteKey, MuteModifiers);
+
+    [JsonIgnore]
+    public ShortcutBinding PeekMedia => new(PeekMediaKey, PeekMediaModifiers);
+
+    [JsonIgnore]
+    public ShortcutBinding PreviousTrack => new(PreviousTrackKey, PreviousTrackModifiers);
+
+    [JsonIgnore]
+    public ShortcutBinding NextTrack => new(NextTrackKey, NextTrackModifiers);
+
+    [JsonIgnore]
+    public ShortcutBinding PlayPause => new(PlayPauseKey, PlayPauseModifiers);
+
+    [JsonIgnore]
+    public ShortcutBinding Stop => new(StopKey, StopModifiers);
+
+    public void Normalize()
+    {
+        ApplyVolumeDown(VolumeDown.Normalize(KeyboardShortcutKeys.VolumeDown));
+        ApplyVolumeUp(VolumeUp.Normalize(KeyboardShortcutKeys.VolumeUp));
+        ApplyMute(Mute.Normalize(KeyboardShortcutKeys.VolumeMute));
+        ApplyPeekMedia(PeekMedia.Normalize(KeyboardShortcutKeys.LaunchMediaSelect));
+        ApplyPreviousTrack(PreviousTrack.Normalize(KeyboardShortcutKeys.MediaPreviousTrack));
+        ApplyNextTrack(NextTrack.Normalize(KeyboardShortcutKeys.MediaNextTrack));
+        ApplyPlayPause(PlayPause.Normalize(KeyboardShortcutKeys.MediaPlayPause));
+        ApplyStop(Stop.Normalize(KeyboardShortcutKeys.MediaStop));
+        RemoveDuplicateBindings();
+    }
+
+    public ShortcutSettings Clone()
+    {
+        return new ShortcutSettings
+        {
+            VolumeDownKey = VolumeDownKey,
+            VolumeDownModifiers = VolumeDownModifiers,
+            VolumeUpKey = VolumeUpKey,
+            VolumeUpModifiers = VolumeUpModifiers,
+            MuteKey = MuteKey,
+            MuteModifiers = MuteModifiers,
+            PeekMediaKey = PeekMediaKey,
+            PeekMediaModifiers = PeekMediaModifiers,
+            PreviousTrackKey = PreviousTrackKey,
+            PreviousTrackModifiers = PreviousTrackModifiers,
+            NextTrackKey = NextTrackKey,
+            NextTrackModifiers = NextTrackModifiers,
+            PlayPauseKey = PlayPauseKey,
+            PlayPauseModifiers = PlayPauseModifiers,
+            StopKey = StopKey,
+            StopModifiers = StopModifiers,
+            ShowOverlayOnMediaKeys = ShowOverlayOnMediaKeys
+        };
+    }
+
+    public void ApplyVolumeDown(ShortcutBinding binding)
+    {
+        VolumeDownKey = binding.VirtualKeyCode;
+        VolumeDownModifiers = binding.Modifiers;
+    }
+
+    public void ApplyVolumeUp(ShortcutBinding binding)
+    {
+        VolumeUpKey = binding.VirtualKeyCode;
+        VolumeUpModifiers = binding.Modifiers;
+    }
+
+    public void ApplyMute(ShortcutBinding binding)
+    {
+        MuteKey = binding.VirtualKeyCode;
+        MuteModifiers = binding.Modifiers;
+    }
+
+    public void ApplyPeekMedia(ShortcutBinding binding)
+    {
+        PeekMediaKey = binding.VirtualKeyCode;
+        PeekMediaModifiers = binding.Modifiers;
+    }
+
+    public void ApplyPreviousTrack(ShortcutBinding binding)
+    {
+        PreviousTrackKey = binding.VirtualKeyCode;
+        PreviousTrackModifiers = binding.Modifiers;
+    }
+
+    public void ApplyNextTrack(ShortcutBinding binding)
+    {
+        NextTrackKey = binding.VirtualKeyCode;
+        NextTrackModifiers = binding.Modifiers;
+    }
+
+    public void ApplyPlayPause(ShortcutBinding binding)
+    {
+        PlayPauseKey = binding.VirtualKeyCode;
+        PlayPauseModifiers = binding.Modifiers;
+    }
+
+    public void ApplyStop(ShortcutBinding binding)
+    {
+        StopKey = binding.VirtualKeyCode;
+        StopModifiers = binding.Modifiers;
+    }
+
+    private void RemoveDuplicateBindings()
+    {
+        var used = new HashSet<ShortcutBinding>();
+        RemoveDuplicate(VolumeDown, ApplyVolumeDown, used);
+        RemoveDuplicate(VolumeUp, ApplyVolumeUp, used);
+        RemoveDuplicate(Mute, ApplyMute, used);
+        RemoveDuplicate(PeekMedia, ApplyPeekMedia, used);
+        RemoveDuplicate(PreviousTrack, ApplyPreviousTrack, used);
+        RemoveDuplicate(NextTrack, ApplyNextTrack, used);
+        RemoveDuplicate(PlayPause, ApplyPlayPause, used);
+        RemoveDuplicate(Stop, ApplyStop, used);
+    }
+
+    private static void RemoveDuplicate(
+        ShortcutBinding binding,
+        Action<ShortcutBinding> apply,
+        HashSet<ShortcutBinding> used)
+    {
+        if (!binding.IsConfigured)
+        {
+            return;
+        }
+
+        if (used.Add(binding))
+        {
+            return;
+        }
+
+        apply(new ShortcutBinding(KeyboardShortcutKeys.None, ShortcutModifiers.None));
+    }
+}
+
+internal sealed class ProfileSettings
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+
+    public string Name { get; set; } = "Padrao";
+
+    public string? LastDeviceId { get; set; }
+
+    public string? LastDeviceName { get; set; }
+
+    public TargetMode TargetMode { get; set; } = TargetMode.Session;
+
+    public string? LastSessionIdentifier { get; set; }
+
+    public string? LastProcessName { get; set; }
+
+    public int? LastProcessId { get; set; }
+
+    public int StepPercent { get; set; } = 5;
+
+    public ShortcutSettings Shortcuts { get; set; } = new();
+
+    public static ProfileSettings FromCurrent(AppSettings settings, string name)
+    {
+        return new ProfileSettings
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Name = string.IsNullOrWhiteSpace(name) ? "Padrao" : name.Trim(),
+            LastDeviceId = settings.LastDeviceId,
+            LastDeviceName = settings.LastDeviceName,
+            TargetMode = settings.TargetMode,
+            LastSessionIdentifier = settings.LastSessionIdentifier,
+            LastProcessName = settings.LastProcessName,
+            LastProcessId = settings.LastProcessId,
+            StepPercent = settings.StepPercent,
+            Shortcuts = settings.Shortcuts.Clone()
+        };
+    }
+
+    public void Normalize()
+    {
+        if (string.IsNullOrWhiteSpace(Id))
+        {
+            Id = Guid.NewGuid().ToString("N");
+        }
+
+        Name = string.IsNullOrWhiteSpace(Name) ? "Padrao" : Name.Trim();
+        StepPercent = Math.Clamp(StepPercent, 1, 50);
+        if (!Enum.IsDefined(TargetMode))
+        {
+            TargetMode = TargetMode.Session;
+        }
+
+        Shortcuts ??= new ShortcutSettings();
+        Shortcuts.Normalize();
+    }
+
+    public override string ToString()
+    {
+        return Name;
+    }
 }
 
 internal static class AppIconLoader

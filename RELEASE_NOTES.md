@@ -1,25 +1,33 @@
-# Volume Key Router v0.1.5
+# Volume Key Router v0.2.0
 
-## Correcao
+## Novidades
 
-- `F1` comum nao e mais interceptado pelo app.
-- O atalho de mostrar midia fica restrito a tecla especial de abrir app de
-  midia, que alguns teclados enviam ao apertar `Fn+F1`.
-- README atualizado para explicar que o Windows nao diferencia `Fn+F1` de `F1`
-  quando o teclado envia apenas `F1` puro.
+- Aba `Overlay` com posicao, largura, duracao, tema claro/escuro e opcao de
+  mostrar ou ocultar a capa.
+- Aba `Atalhos` com gravacao de combinacoes de teclas.
+- Atalhos aceitam modificadores como `Ctrl`, `Shift`, `Alt` e `Win`.
+- Botao `↺` ao lado de cada atalho para restaurar somente aquela funcao.
+- Botao `Redefinir todos` para voltar todos os atalhos ao padrao.
+- Bloqueio de atalhos duplicados na interface.
+- Perfis para guardar alvo, dispositivo, passo e atalhos diferentes.
+- Menu da bandeja com abrir janela, mostrar overlay, pausar roteamento,
+  recarregar dispositivos, trocar perfil e sair.
 
-## Mantido da v0.1.4
+## Correcoes
 
-- Overlay por teclas manuais de midia.
-- Titulo/artista aparecem antes da capa, sem segurar a abertura do overlay.
-- Espaco da capa fica reservado enquanto ela carrega para evitar deslocamento
-  do texto.
-- Instalador com opcoes `Atualizar` e `Reparar`.
+- Teclas `Fn+F2/F3/F4` voltam a ser capturadas mesmo quando o driver do teclado
+  envia eventos marcados como injetados.
+- O app ignora apenas teclas injetadas por ele mesmo ao repassar comandos de
+  midia para o Windows.
+- Texto selecionado em `Perfil`, `Posicao` e `Tema` nao fica mais preto no tema
+  escuro.
+- O overlay reposiciona corretamente ao mudar largura ou posicao.
+- Duplicatas vindas manualmente do `settings.json` sao desativadas ao carregar.
 
 ## Arquivo da Release
 
 ```text
-VolumeKeyRouterSetup-0.1.5.exe
+VolumeKeyRouterSetup-0.2.0.exe
 ```
 
 ## Notas

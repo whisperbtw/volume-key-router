@@ -15,7 +15,7 @@ namespace VolumeKeyRouter;
 
 public sealed partial class VolumeOverlayWindow : Window
 {
-    private const int HideDelayMs = 1200;
+    private const int DefaultHideDelayMs = 1200;
     private const int WsExNoActivate = 0x08000000;
     private const int WsExToolWindow = 0x00000080;
     private const int GwlExStyle = -20;
@@ -30,13 +30,16 @@ public sealed partial class VolumeOverlayWindow : Window
 
     private readonly DispatcherTimer hideTimer = new()
     {
-        Interval = TimeSpan.FromMilliseconds(HideDelayMs)
+        Interval = TimeSpan.FromMilliseconds(DefaultHideDelayMs)
     };
     private float currentVolume;
     private string? currentMediaDetail;
     private int currentArtworkFingerprint;
     private int currentArtworkLength;
     private bool hasArtwork;
+    private bool showArtwork = true;
+    private OverlayPosition overlayPosition = OverlayPosition.BottomCenter;
+    private OverlayTheme overlayTheme = OverlayTheme.Dark;
 
     public VolumeOverlayWindow()
     {
@@ -47,6 +50,39 @@ public sealed partial class VolumeOverlayWindow : Window
             hideTimer.Stop();
             Hide();
         };
+    }
+
+    internal void Configure(OverlaySettings settings)
+    {
+        settings.Normalize();
+        Width = settings.Width;
+        hideTimer.Interval = TimeSpan.FromMilliseconds(settings.DurationMs);
+        showArtwork = settings.ShowArtwork;
+        overlayPosition = settings.Position;
+        overlayTheme = settings.Theme;
+        ApplyTheme();
+
+        if (!showArtwork)
+        {
+            hasArtwork = false;
+            currentArtworkFingerprint = 0;
+            currentArtworkLength = 0;
+            ArtworkFrame.Background = EmptyArtworkBrush;
+            ArtworkFrame.Visibility = Visibility.Collapsed;
+        }
+        else if (!hasArtwork)
+        {
+            ArtworkFrame.Visibility = ShouldReserveArtworkSpace()
+                ? Visibility.Hidden
+                : Visibility.Collapsed;
+        }
+
+        if (IsVisible)
+        {
+            UpdateLayout();
+            PositionNearTaskbar();
+            BringToTopWithoutActivation();
+        }
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -75,15 +111,14 @@ public sealed partial class VolumeOverlayWindow : Window
             UpdateMedia(detail, artworkBytes);
         }
 
-        UpdateBarFill();
-
-        PositionNearTaskbar();
-
         if (!IsVisible)
         {
             Show();
         }
 
+        UpdateLayout();
+        UpdateBarFill();
+        PositionNearTaskbar();
         BringToTopWithoutActivation();
         hideTimer.Stop();
         hideTimer.Start();
@@ -124,6 +159,16 @@ public sealed partial class VolumeOverlayWindow : Window
 
     private void UpdateArtwork(byte[]? artworkBytes)
     {
+        if (!showArtwork)
+        {
+            hasArtwork = false;
+            currentArtworkFingerprint = 0;
+            currentArtworkLength = 0;
+            ArtworkFrame.Background = EmptyArtworkBrush;
+            ArtworkFrame.Visibility = Visibility.Collapsed;
+            return;
+        }
+
         if (artworkBytes is null || artworkBytes.Length == 0)
         {
             hasArtwork = false;
@@ -169,7 +214,7 @@ public sealed partial class VolumeOverlayWindow : Window
 
     private bool ShouldReserveArtworkSpace()
     {
-        return currentMediaDetail is not null;
+        return showArtwork && currentMediaDetail is not null;
     }
 
     private static int ComputeArtworkFingerprint(byte[] artworkBytes)
@@ -203,8 +248,70 @@ public sealed partial class VolumeOverlayWindow : Window
         var topLeft = transform.Transform(new System.Windows.Point(screen.Left, screen.Top));
         var size = transform.Transform(new Vector(screen.Width, screen.Height));
 
-        Left = topLeft.X + (size.X - Width) / 2;
-        Top = topLeft.Y + size.Y - Height - 64;
+        const double edgeMargin = 28;
+        const double taskbarMargin = 64;
+        var windowWidth = GetEffectiveWidth();
+        var windowHeight = GetEffectiveHeight();
+
+        Left = overlayPosition switch
+        {
+            OverlayPosition.BottomLeft or OverlayPosition.TopLeft => topLeft.X + edgeMargin,
+            OverlayPosition.BottomRight or OverlayPosition.TopRight => topLeft.X + size.X - windowWidth - edgeMargin,
+            _ => topLeft.X + (size.X - windowWidth) / 2
+        };
+        Top = overlayPosition switch
+        {
+            OverlayPosition.TopCenter or OverlayPosition.TopLeft or OverlayPosition.TopRight => topLeft.Y + edgeMargin,
+            _ => topLeft.Y + size.Y - windowHeight - taskbarMargin
+        };
+    }
+
+    private double GetEffectiveWidth()
+    {
+        if (ActualWidth > 0)
+        {
+            return ActualWidth;
+        }
+
+        return double.IsNaN(Width) || Width <= 0 ? 430 : Width;
+    }
+
+    private double GetEffectiveHeight()
+    {
+        if (ActualHeight > 0)
+        {
+            return ActualHeight;
+        }
+
+        return double.IsNaN(Height) || Height <= 0 ? 136 : Height;
+    }
+
+    private void ApplyTheme()
+    {
+        if (overlayTheme == OverlayTheme.Light)
+        {
+            RootBorder.Background = new MediaSolidColorBrush(MediaColor.FromArgb(242, 246, 248, 252));
+            TargetText.Foreground = new MediaSolidColorBrush(MediaColor.FromRgb(78, 86, 99));
+            DetailText.Foreground = new MediaSolidColorBrush(MediaColor.FromRgb(18, 21, 27));
+            PercentText.Foreground = new MediaSolidColorBrush(MediaColor.FromRgb(18, 21, 27));
+            BarBackground.Background = new MediaSolidColorBrush(MediaColor.FromRgb(214, 220, 229));
+            if (!hasArtwork)
+            {
+                ArtworkFrame.Background = new MediaSolidColorBrush(MediaColor.FromRgb(222, 227, 235));
+            }
+
+            return;
+        }
+
+        RootBorder.Background = new MediaSolidColorBrush(MediaColor.FromArgb(242, 18, 20, 25));
+        TargetText.Foreground = new MediaSolidColorBrush(MediaColor.FromRgb(182, 190, 202));
+        DetailText.Foreground = new MediaSolidColorBrush(MediaColor.FromRgb(242, 244, 248));
+        PercentText.Foreground = new MediaSolidColorBrush(MediaColor.FromRgb(242, 244, 248));
+        BarBackground.Background = new MediaSolidColorBrush(MediaColor.FromRgb(42, 47, 58));
+        if (!hasArtwork)
+        {
+            ArtworkFrame.Background = EmptyArtworkBrush;
+        }
     }
 
     private void BringToTopWithoutActivation()

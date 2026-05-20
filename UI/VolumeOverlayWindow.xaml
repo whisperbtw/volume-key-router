@@ -11,7 +11,7 @@
         AllowsTransparency="True"
         Background="Transparent"
         Foreground="#F2F4F8">
-    <Border Background="#F2121419" CornerRadius="14" Padding="16,14,18,16">
+    <Border x:Name="RootBorder" Background="#F2121419" CornerRadius="14" Padding="16,14,18,16">
         <DockPanel LastChildFill="True">
             <Border x:Name="ArtworkFrame"
                     DockPanel.Dock="Left"
@@ -38,7 +38,7 @@
 
             <TextBlock x:Name="DetailText" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Foreground="#F2F4F8" FontSize="13" TextTrimming="CharacterEllipsis" Visibility="Collapsed" Margin="0,0,0,8" />
 
-            <Border Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Height="14" VerticalAlignment="Center" Background="#2A2F3A" CornerRadius="3" Padding="2">
+            <Border x:Name="BarBackground" Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Height="14" VerticalAlignment="Center" Background="#2A2F3A" CornerRadius="3" Padding="2">
                 <Grid x:Name="BarTrack">
                     <Border x:Name="BarFill" HorizontalAlignment="Left" Background="#26D07C" CornerRadius="2" />
                 </Grid>
