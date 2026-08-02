@@ -56,23 +56,67 @@ internal sealed class AppSettings
 
     public static AppSettings Load()
     {
+        var settings = TryLoad(SettingsPath);
+        if (settings is not null)
+        {
+            return settings;
+        }
+
+        settings = TryLoad(BackupPath);
+        if (settings is not null)
+        {
+            return settings;
+        }
+
+        TryPreserveCorruptFile(SettingsPath);
+        settings = new AppSettings();
+        settings.Normalize(applyActiveProfile: true);
+        return settings;
+    }
+
+    private static AppSettings? TryLoad(string path)
+    {
         try
         {
-            if (!File.Exists(SettingsPath))
+            if (!File.Exists(path))
             {
-                return new AppSettings();
+                return null;
             }
 
-            var settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(SettingsPath), JsonOptions)
+            var settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path), JsonOptions)
                 ?? new AppSettings();
             settings.Normalize(applyActiveProfile: true);
             return settings;
         }
         catch
         {
-            var settings = new AppSettings();
-            settings.Normalize(applyActiveProfile: true);
-            return settings;
+            TryPreserveCorruptFile(path);
+            return null;
+        }
+    }
+
+    private static void TryPreserveCorruptFile(string path)
+    {
+        if (!File.Exists(path))
+        {
+            return;
+        }
+
+        try
+        {
+            var directory = Path.GetDirectoryName(path);
+            if (string.IsNullOrWhiteSpace(directory))
+            {
+                return;
+            }
+
+            var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
+            var target = Path.Combine(directory, $"{Path.GetFileNameWithoutExtension(path)}.corrupt-{stamp}.json");
+            File.Copy(path, target, overwrite: true);
+        }
+        catch
+        {
+            // Best effort; never block startup because a backup failed.
         }
     }
 
@@ -85,7 +129,29 @@ internal sealed class AppSettings
         }
 
         Normalize(applyActiveProfile: false);
-        File.WriteAllText(SettingsPath, JsonSerializer.Serialize(this, JsonOptions));
+        var json = JsonSerializer.Serialize(this, JsonOptions);
+
+        // Write to a temp file and move it into place atomically, so an
+        // interrupted write can never leave the settings file corrupted.
+        var tempPath = SettingsPath + ".tmp";
+        File.WriteAllText(tempPath, json);
+        if (File.Exists(SettingsPath))
+        {
+            File.Replace(tempPath, SettingsPath, null);
+        }
+        else
+        {
+            File.Move(tempPath, SettingsPath);
+        }
+
+        try
+        {
+            File.Copy(SettingsPath, BackupPath, overwrite: true);
+        }
+        catch
+        {
+            // Best effort; the live file is already in place.
+        }
     }
 
     public void UpdateActiveProfileFromCurrent()
@@ -199,6 +265,8 @@ internal sealed class AppSettings
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "volume-key-router",
         "settings.json");
+
+    private static string BackupPath => SettingsPath + ".bak";
 }
 
 internal sealed class OverlaySettings
@@ -343,7 +411,6 @@ internal sealed class ShortcutSettings
         ApplyNextTrack(NextTrack.Normalize(KeyboardShortcutKeys.MediaNextTrack));
         ApplyPlayPause(PlayPause.Normalize(KeyboardShortcutKeys.MediaPlayPause));
         ApplyStop(Stop.Normalize(KeyboardShortcutKeys.MediaStop));
-        RemoveDuplicateBindings();
     }
 
     public ShortcutSettings Clone()
@@ -416,37 +483,6 @@ internal sealed class ShortcutSettings
     {
         StopKey = binding.VirtualKeyCode;
         StopModifiers = binding.Modifiers;
-    }
-
-    private void RemoveDuplicateBindings()
-    {
-        var used = new HashSet<ShortcutBinding>();
-        RemoveDuplicate(VolumeDown, ApplyVolumeDown, used);
-        RemoveDuplicate(VolumeUp, ApplyVolumeUp, used);
-        RemoveDuplicate(Mute, ApplyMute, used);
-        RemoveDuplicate(PeekMedia, ApplyPeekMedia, used);
-        RemoveDuplicate(PreviousTrack, ApplyPreviousTrack, used);
-        RemoveDuplicate(NextTrack, ApplyNextTrack, used);
-        RemoveDuplicate(PlayPause, ApplyPlayPause, used);
-        RemoveDuplicate(Stop, ApplyStop, used);
-    }
-
-    private static void RemoveDuplicate(
-        ShortcutBinding binding,
-        Action<ShortcutBinding> apply,
-        HashSet<ShortcutBinding> used)
-    {
-        if (!binding.IsConfigured)
-        {
-            return;
-        }
-
-        if (used.Add(binding))
-        {
-            return;
-        }
-
-        apply(new ShortcutBinding(KeyboardShortcutKeys.None, ShortcutModifiers.None));
     }
 }
 

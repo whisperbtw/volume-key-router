@@ -1,29 +1,26 @@
-# Volume Key Router v0.3.0
+# Volume Key Router v0.3.1
 
-## Novidades
+## Correcao: perfis e atalhos nao resetam mais
 
-- Aba `Sistema` agora tem o botao `Verificar atualizacao`.
-- A verificacao manual compara a versao instalada com a ultima release do
-  GitHub e pode abrir a pagina da release quando houver versao nova.
-- O tamanho do overlay agora usa presets de tamanho total.
-- Novo preset `Muito pequeno` para quem quer um overlay bem compacto.
-- Presets disponiveis: `Muito pequeno`, `Pequeno`, `Padrao` e `Grande`.
-
-## Ajustes do overlay e da midia
-
-- O overlay aplica largura e altura pelos presets, em vez de ajustar so a
-  largura.
-- O preset `Muito pequeno` usa padding, capa, textos e barra reduzidos para nao
-  ficar apenas espremido.
-- Ao avancar ou voltar faixa manualmente, o overlay espera metadados atualizados
-  antes de mostrar a musica, reduzindo o caso de aparecer a faixa anterior.
-- Enquanto a proxima faixa ainda nao chegou pelos controles de midia do Windows,
-  o overlay mostra `Trocando midia`.
+- Corrigido o reset total de perfis e atalhos quando o arquivo de
+  configuracoes (`%AppData%\volume-key-router\settings.json`) falhava ao ser
+  lido.
+- A gravacao agora e atomica: primeiro escreve num arquivo temporario e depois
+  substitui o arquivo real, entao uma gravacao interrompida nao corrompe mais
+  as configuracoes.
+- Se o arquivo principal estiver corrompido, o app tenta recuperar do backup
+  (`settings.json.bak`), que e atualizado a cada salvamento.
+- Se nao houver recuperacao possivel, o arquivo corrompido e preservado como
+  `settings.json.corrupt-<data>.json` para recuperacao manual, em vez de ser
+  apagado em silencio.
+- Atalhos duplicados nao sao mais desativados silenciosamente ao salvar.
+  A interface ja bloqueia duplicados; agora a configuracao existente e
+  preservada.
 
 ## Arquivo da Release
 
 ```text
-VolumeKeyRouterSetup-0.3.0.exe
+VolumeKeyRouterSetup-0.3.1.exe
 ```
 
 ## Notas
