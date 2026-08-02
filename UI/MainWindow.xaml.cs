@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Runtime.Versioning;
@@ -2158,14 +2159,21 @@ public sealed partial class MainWindow : Window
 
     public sealed class SessionRow : INotifyPropertyChanged
     {
+        private static readonly ImageSource DefaultProcessIcon = CreateIconSource(Drawing.SystemIcons.Application);
+        private static readonly Dictionary<uint, ImageSource> ProcessIconCache = new();
+        private static readonly object ProcessIconCacheGate = new();
+
         internal SessionRow(AudioSessionInfo info)
         {
             Info = info;
+            ProcessIcon = GetProcessIcon(info.ProcessId);
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
         internal AudioSessionInfo Info { get; private set; }
+
+        public ImageSource ProcessIcon { get; private set; }
 
         public string ProcessName => Info.ProcessName;
 
@@ -2179,7 +2187,13 @@ public sealed partial class MainWindow : Window
 
         internal void Update(AudioSessionInfo info)
         {
+            var processChanged = Info.ProcessId != info.ProcessId;
             Info = info;
+            if (processChanged)
+            {
+                ProcessIcon = GetProcessIcon(info.ProcessId);
+            }
+
             OnPropertyChanged(string.Empty);
         }
 
@@ -2192,6 +2206,60 @@ public sealed partial class MainWindow : Window
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        private static ImageSource GetProcessIcon(uint processId)
+        {
+            if (processId == 0)
+            {
+                return DefaultProcessIcon;
+            }
+
+            lock (ProcessIconCacheGate)
+            {
+                if (ProcessIconCache.TryGetValue(processId, out var cachedIcon))
+                {
+                    return cachedIcon;
+                }
+            }
+
+            var icon = TryLoadProcessIcon(processId) ?? DefaultProcessIcon;
+            lock (ProcessIconCacheGate)
+            {
+                ProcessIconCache[processId] = icon;
+            }
+
+            return icon;
+        }
+
+        private static ImageSource? TryLoadProcessIcon(uint processId)
+        {
+            try
+            {
+                using var process = Process.GetProcessById((int)processId);
+                var path = process.MainModule?.FileName;
+                if (string.IsNullOrWhiteSpace(path))
+                {
+                    return null;
+                }
+
+                using var icon = Drawing.Icon.ExtractAssociatedIcon(path);
+                return icon is null ? null : CreateIconSource(icon);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static ImageSource CreateIconSource(Drawing.Icon icon)
+        {
+            var source = Imaging.CreateBitmapSourceFromHIcon(
+                icon.Handle,
+                Int32Rect.Empty,
+                BitmapSizeOptions.FromWidthAndHeight(18, 18));
+            source.Freeze();
+            return source;
         }
     }
 

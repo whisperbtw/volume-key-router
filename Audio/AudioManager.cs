@@ -79,6 +79,10 @@ internal sealed class AudioManager : IDisposable
                 var processName = TryGetProcessName(processId) ?? "(desconhecido)";
                 var displayName = NullIfWhiteSpace(session.DisplayName);
                 var sessionIdentifier = NullIfWhiteSpace(session.GetSessionIdentifier);
+                if (IsSystemAudioServiceSession(processId, displayName, sessionIdentifier))
+                {
+                    continue;
+                }
 
                 result.Add(new AudioSessionInfo(
                     processId,
@@ -397,6 +401,23 @@ internal sealed class AudioManager : IDisposable
         {
             return null;
         }
+    }
+
+    private static bool IsSystemAudioServiceSession(uint processId, string? displayName, string? sessionIdentifier)
+    {
+        if (processId != 0)
+        {
+            return false;
+        }
+
+        return ContainsAudioServiceResource(displayName) ||
+            ContainsAudioServiceResource(sessionIdentifier);
+    }
+
+    private static bool ContainsAudioServiceResource(string? value)
+    {
+        return !string.IsNullOrWhiteSpace(value) &&
+            value.Contains("AudioSrv.dll", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string GetReadableDeviceName(NAudio.CoreAudioApi.MMDevice device)

@@ -272,7 +272,16 @@
                 <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Padding="10">
                     <DataGrid x:Name="SessionGrid" AutoGenerateColumns="False" ItemsSource="{Binding Sessions}" SelectionChanged="SessionGrid_SelectionChanged">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="App" Binding="{Binding ProcessName}" Width="180" />
+                            <DataGridTemplateColumn Header="App" Width="210">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Image Width="18" Height="18" Source="{Binding ProcessIcon}" Margin="0,0,8,0" />
+                                            <TextBlock Text="{Binding ProcessName}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
                             <DataGridTextColumn Header="PID" Binding="{Binding ProcessIdText}" Width="80" />
                             <DataGridTextColumn Header="Estado" Binding="{Binding State}" Width="90" />
                             <DataGridTextColumn Header="Volume" Binding="{Binding VolumeText}" Width="80" />

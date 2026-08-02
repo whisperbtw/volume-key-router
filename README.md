@@ -23,6 +23,7 @@ a interface, este README e os textos do projeto.
 - Se o alvo estiver mutado, `Volume Up` ou `Volume Down` desmuta o alvo antes
   de ajustar o volume.
 - Permite escolher o alvo pela interface grafica.
+- Mostra o icone do processo na lista de apps/sessoes quando o Windows permite.
 - Salva a ultima escolha e tenta restaura-la ao abrir novamente.
 - Se o ultimo app ou dispositivo ainda nao estiver disponivel, procura em
   segundo plano sem ficar piscando a interface.
