@@ -59,6 +59,12 @@ public sealed partial class MainWindow : Window
     {
         Interval = TimeSpan.FromMilliseconds(1500)
     };
+    private readonly DispatcherTimer deviceNotificationTimer = new()
+    {
+        Interval = TimeSpan.FromMilliseconds(400)
+    };
+    private bool pendingSelectDefault;
+    private bool pendingRestoreSession;
 
     private VolumeKeyHook? hook;
     private TargetSnapshot targetSnapshot = TargetSnapshot.Invalid;
@@ -167,6 +173,10 @@ public sealed partial class MainWindow : Window
 
         BuildTray();
         UpdateCaptureButton();
+
+        deviceNotificationTimer.Tick += (_, _) => ApplyPendingDeviceRefresh();
+        audioManager.DevicesChanged += OnAudioDevicesChanged;
+        audioManager.DefaultDeviceChanged += OnAudioDefaultDeviceChanged;
     }
 
     private void InitializeRuntime()
@@ -292,6 +302,7 @@ public sealed partial class MainWindow : Window
             }
             MinimizeToTrayBox.IsChecked = settings.MinimizeToTray;
             StartMinimizedBox.IsChecked = settings.StartMinimized;
+            FollowDefaultDeviceBox.IsChecked = settings.FollowDefaultDevice;
             ShowOverlayBox.IsChecked = settings.ShowVolumeOverlay;
             ApplyOverlaySettingsToControls();
             ApplyShortcutSettingsToControls();
@@ -691,7 +702,7 @@ public sealed partial class MainWindow : Window
         return modifiers;
     }
 
-    private void RefreshDevices(bool restoreSavedTarget = false)
+    private void RefreshDevices(bool restoreSavedTarget = false, bool preferDefault = false)
     {
         refreshing = true;
         try
@@ -699,17 +710,26 @@ public sealed partial class MainWindow : Window
             var previousId = restoreSavedTarget ? settings.LastDeviceId : SelectedDevice?.Id ?? settings.LastDeviceId;
             var hasSavedDevice = !string.IsNullOrWhiteSpace(settings.LastDeviceId) ||
                 !string.IsNullOrWhiteSpace(settings.LastDeviceName);
+            var followDefault = preferDefault || settings.FollowDefaultDevice;
             var devices = audioManager.ListOutputDevices();
 
             DeviceCombo.ItemsSource = devices;
-            var selected = devices.FirstOrDefault(device => device.Id == previousId)
-                ?? devices.FirstOrDefault(device =>
-                    !string.IsNullOrWhiteSpace(settings.LastDeviceName) &&
-                    device.Name.Contains(settings.LastDeviceName, StringComparison.OrdinalIgnoreCase));
-
-            if (!restoreSavedTarget || !hasSavedDevice)
+            AudioDeviceInfo? selected;
+            if (followDefault)
             {
-                selected ??= devices.FirstOrDefault(device => device.IsDefault) ?? devices.FirstOrDefault();
+                selected = devices.FirstOrDefault(device => device.IsDefault) ?? devices.FirstOrDefault();
+            }
+            else
+            {
+                selected = devices.FirstOrDefault(device => device.Id == previousId)
+                    ?? devices.FirstOrDefault(device =>
+                        !string.IsNullOrWhiteSpace(settings.LastDeviceName) &&
+                        device.Name.Contains(settings.LastDeviceName, StringComparison.OrdinalIgnoreCase));
+
+                if (!restoreSavedTarget || !hasSavedDevice)
+                {
+                    selected ??= devices.FirstOrDefault(device => device.IsDefault) ?? devices.FirstOrDefault();
+                }
             }
 
             DeviceCombo.SelectedItem = selected;
@@ -779,6 +799,40 @@ public sealed partial class MainWindow : Window
         {
             UpdateTargetSnapshot();
         }
+    }
+
+    private void OnAudioDevicesChanged()
+    {
+        BeginInvokeSafe(() => QueueDeviceRefresh(selectDefault: settings.FollowDefaultDevice, restoreSession: false));
+    }
+
+    private void OnAudioDefaultDeviceChanged(string? defaultDeviceId)
+    {
+        BeginInvokeSafe(() =>
+        {
+            if (settings.FollowDefaultDevice)
+            {
+                QueueDeviceRefresh(selectDefault: true, restoreSession: true);
+            }
+        });
+    }
+
+    private void QueueDeviceRefresh(bool selectDefault, bool restoreSession)
+    {
+        pendingSelectDefault |= selectDefault;
+        pendingRestoreSession |= restoreSession;
+        deviceNotificationTimer.Stop();
+        deviceNotificationTimer.Start();
+    }
+
+    private void ApplyPendingDeviceRefresh()
+    {
+        deviceNotificationTimer.Stop();
+        var selectDefault = pendingSelectDefault;
+        var restoreSession = pendingRestoreSession;
+        pendingSelectDefault = false;
+        pendingRestoreSession = false;
+        RefreshDevices(restoreSavedTarget: restoreSession, preferDefault: selectDefault);
     }
 
     private void ToggleCapture()
@@ -1744,6 +1798,7 @@ public sealed partial class MainWindow : Window
         settings.CaptureActive = captureActive;
         settings.MinimizeToTray = MinimizeToTrayBox.IsChecked == true;
         settings.StartMinimized = StartMinimizedBox.IsChecked == true;
+        settings.FollowDefaultDevice = FollowDefaultDeviceBox.IsChecked == true;
         settings.StartWithWindows = StartWithWindowsBox.IsChecked == true;
         settings.ShowVolumeOverlay = ShowOverlayBox.IsChecked == true;
         CopyOverlayControlsToSettings();
@@ -1769,6 +1824,9 @@ public sealed partial class MainWindow : Window
         activationEvent?.Set();
         activationWatcherCancellation.Dispose();
         savedTargetSearchTimer.Stop();
+        deviceNotificationTimer.Stop();
+        audioManager.DevicesChanged -= OnAudioDevicesChanged;
+        audioManager.DefaultDeviceChanged -= OnAudioDefaultDeviceChanged;
         trayIcon.Visible = false;
         trayIcon.Dispose();
         trayMenu.Dispose();
@@ -1848,6 +1906,26 @@ public sealed partial class MainWindow : Window
 
         settings.MinimizeToTray = MinimizeToTrayBox.IsChecked == true;
         SaveSettings();
+    }
+
+    private void FollowDefaultDeviceBox_Changed(object sender, RoutedEventArgs e)
+    {
+        if (suppressSettingsSave)
+        {
+            return;
+        }
+
+        settings.FollowDefaultDevice = FollowDefaultDeviceBox.IsChecked == true;
+        SaveSettings();
+        if (settings.FollowDefaultDevice)
+        {
+            RefreshDevices(restoreSavedTarget: true, preferDefault: true);
+            SetStatus("Seguindo o dispositivo padrao do Windows.");
+        }
+        else
+        {
+            SetStatus("Seguindo o dispositivo salvo.");
+        }
     }
 
     private void StartMinimizedBox_Changed(object sender, RoutedEventArgs e)

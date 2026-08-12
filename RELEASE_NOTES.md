@@ -1,26 +1,25 @@
-# Volume Key Router v0.3.1
+# Volume Key Router v0.4.0
 
-## Correcao: perfis e atalhos nao resetam mais
+## Seguir o dispositivo padrao e detectar saidas novas (Bluetooth)
 
-- Corrigido o reset total de perfis e atalhos quando o arquivo de
-  configuracoes (`%AppData%\volume-key-router\settings.json`) falhava ao ser
-  lido.
-- A gravacao agora e atomica: primeiro escreve num arquivo temporario e depois
-  substitui o arquivo real, entao uma gravacao interrompida nao corrompe mais
-  as configuracoes.
-- Se o arquivo principal estiver corrompido, o app tenta recuperar do backup
-  (`settings.json.bak`), que e atualizado a cada salvamento.
-- Se nao houver recuperacao possivel, o arquivo corrompido e preservado como
-  `settings.json.corrupt-<data>.json` para recuperacao manual, em vez de ser
-  apagado em silencio.
-- Atalhos duplicados nao sao mais desativados silenciosamente ao salvar.
-  A interface ja bloqueia duplicados; agora a configuracao existente e
-  preservada.
+- Nova opcao `Seguir o dispositivo padrao do Windows` na aba principal.
+  Quando marcada, o app acompanha automaticamente a saida ativa no Windows:
+  se voce trocar o padrao (fone Bluetooth, cabo, alto-falante), o alvo troca
+  junto, sem precisar abrir o app.
+- A lista de dispositivos agora atualiza sozinha quando uma saida entra ou sai:
+  conectar um fone Bluetooth faz a nova saida aparecer na hora, sem clicar em
+  `Atualizar`.
+- Ao seguir o padrao, o app tenta manter o app selecionado: se a sessao existir
+  na nova saida, ela e restaurada. Em modo `Linha/dispositivo selecionado`, o
+  alvo passa a ser a nova saida padrao.
+- Desconectar o fone Bluetooth volta o alvo para a saida padrao restante.
+- A opcao pode ser salva por perfil e fica desligada por padrao, preservando o
+  comportamento atual de alvo fixo.
 
 ## Arquivo da Release
 
 ```text
-VolumeKeyRouterSetup-0.3.1.exe
+VolumeKeyRouterSetup-0.4.0.exe
 ```
 
 ## Notas

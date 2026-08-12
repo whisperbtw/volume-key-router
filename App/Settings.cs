@@ -22,6 +22,8 @@ internal sealed class AppSettings
 
     public string? LastDeviceName { get; set; }
 
+    public bool FollowDefaultDevice { get; set; }
+
     public TargetMode TargetMode { get; set; } = TargetMode.Session;
 
     public string? LastSessionIdentifier { get; set; }
@@ -164,6 +166,7 @@ internal sealed class AppSettings
 
         profile.LastDeviceId = LastDeviceId;
         profile.LastDeviceName = LastDeviceName;
+        profile.FollowDefaultDevice = FollowDefaultDevice;
         profile.TargetMode = TargetMode;
         profile.LastSessionIdentifier = LastSessionIdentifier;
         profile.LastProcessName = LastProcessName;
@@ -183,6 +186,7 @@ internal sealed class AppSettings
 
         LastDeviceId = profile.LastDeviceId;
         LastDeviceName = profile.LastDeviceName;
+        FollowDefaultDevice = profile.FollowDefaultDevice;
         TargetMode = profile.TargetMode;
         LastSessionIdentifier = profile.LastSessionIdentifier;
         LastProcessName = profile.LastProcessName;
@@ -496,6 +500,8 @@ internal sealed class ProfileSettings
 
     public string? LastDeviceName { get; set; }
 
+    public bool FollowDefaultDevice { get; set; }
+
     public TargetMode TargetMode { get; set; } = TargetMode.Session;
 
     public string? LastSessionIdentifier { get; set; }
@@ -516,6 +522,7 @@ internal sealed class ProfileSettings
             Name = string.IsNullOrWhiteSpace(name) ? "Padrao" : name.Trim(),
             LastDeviceId = settings.LastDeviceId,
             LastDeviceName = settings.LastDeviceName,
+            FollowDefaultDevice = settings.FollowDefaultDevice,
             TargetMode = settings.TargetMode,
             LastSessionIdentifier = settings.LastSessionIdentifier,
             LastProcessName = settings.LastProcessName,

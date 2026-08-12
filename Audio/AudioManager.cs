@@ -13,7 +13,19 @@ namespace VolumeKeyRouter;
 internal sealed class AudioManager : IDisposable
 {
     private readonly NAudio.CoreAudioApi.MMDeviceEnumerator deviceEnumerator = new();
+    private readonly DeviceNotificationClient notificationClient = new();
     private readonly object gate = new();
+
+    public event Action? DevicesChanged;
+
+    public event Action<string?>? DefaultDeviceChanged;
+
+    public AudioManager()
+    {
+        notificationClient.DevicesChanged += () => DevicesChanged?.Invoke();
+        notificationClient.DefaultDeviceChanged += id => DefaultDeviceChanged?.Invoke(id);
+        deviceEnumerator.RegisterEndpointNotificationCallback(notificationClient);
+    }
 
     public IReadOnlyList<AudioDeviceInfo> ListOutputDevices()
     {
@@ -58,6 +70,24 @@ internal sealed class AudioManager : IDisposable
                 .OrderByDescending(device => device.IsDefault)
                 .ThenBy(device => device.Name, StringComparer.CurrentCultureIgnoreCase)
                 .ToArray();
+        }
+    }
+
+    public string? GetDefaultOutputDeviceId()
+    {
+        lock (gate)
+        {
+            if (!deviceEnumerator.HasDefaultAudioEndpoint(
+                NAudio.CoreAudioApi.DataFlow.Render,
+                NAudio.CoreAudioApi.Role.Multimedia))
+            {
+                return null;
+            }
+
+            using var defaultDevice = deviceEnumerator.GetDefaultAudioEndpoint(
+                NAudio.CoreAudioApi.DataFlow.Render,
+                NAudio.CoreAudioApi.Role.Multimedia);
+            return defaultDevice.ID;
         }
     }
 
@@ -269,6 +299,7 @@ internal sealed class AudioManager : IDisposable
 
     public void Dispose()
     {
+        deviceEnumerator.UnregisterEndpointNotificationCallback(notificationClient);
         deviceEnumerator.Dispose();
     }
 
@@ -445,5 +476,43 @@ internal sealed class AudioManager : IDisposable
         return state.StartsWith("AudioSessionState", StringComparison.Ordinal)
             ? state["AudioSessionState".Length..]
             : state;
+    }
+
+    private sealed class DeviceNotificationClient : NAudio.CoreAudioApi.Interfaces.IMMNotificationClient
+    {
+        public event Action? DevicesChanged;
+
+        public event Action<string?>? DefaultDeviceChanged;
+
+        public void OnDeviceStateChanged(string deviceId, NAudio.CoreAudioApi.DeviceState newState)
+        {
+            DevicesChanged?.Invoke();
+        }
+
+        public void OnDeviceAdded(string deviceId)
+        {
+            DevicesChanged?.Invoke();
+        }
+
+        public void OnDeviceRemoved(string deviceId)
+        {
+            DevicesChanged?.Invoke();
+        }
+
+        public void OnDefaultDeviceChanged(
+            NAudio.CoreAudioApi.DataFlow flow,
+            NAudio.CoreAudioApi.Role role,
+            string defaultDeviceId)
+        {
+            if (flow == NAudio.CoreAudioApi.DataFlow.Render &&
+                role == NAudio.CoreAudioApi.Role.Multimedia)
+            {
+                DefaultDeviceChanged?.Invoke(string.IsNullOrWhiteSpace(defaultDeviceId) ? null : defaultDeviceId);
+            }
+        }
+
+        public void OnPropertyValueChanged(string deviceId, NAudio.CoreAudioApi.PropertyKey key)
+        {
+        }
     }
 }
