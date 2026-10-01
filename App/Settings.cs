@@ -379,6 +379,10 @@ internal sealed class ShortcutSettings
 
     public ShortcutModifiers StopModifiers { get; set; } = ShortcutModifiers.None;
 
+    public int LikeTrackKey { get; set; } = 0x4C; // L
+
+    public ShortcutModifiers LikeTrackModifiers { get; set; } = ShortcutModifiers.Control | ShortcutModifiers.Alt;
+
     public bool ShowOverlayOnMediaKeys { get; set; } = true;
 
     [JsonIgnore]
@@ -405,6 +409,9 @@ internal sealed class ShortcutSettings
     [JsonIgnore]
     public ShortcutBinding Stop => new(StopKey, StopModifiers);
 
+    [JsonIgnore]
+    public ShortcutBinding LikeTrack => new(LikeTrackKey, LikeTrackModifiers);
+
     public void Normalize()
     {
         ApplyVolumeDown(VolumeDown.Normalize(KeyboardShortcutKeys.VolumeDown));
@@ -415,6 +422,7 @@ internal sealed class ShortcutSettings
         ApplyNextTrack(NextTrack.Normalize(KeyboardShortcutKeys.MediaNextTrack));
         ApplyPlayPause(PlayPause.Normalize(KeyboardShortcutKeys.MediaPlayPause));
         ApplyStop(Stop.Normalize(KeyboardShortcutKeys.MediaStop));
+        ApplyLikeTrack(LikeTrack.Normalize(0x4C));
     }
 
     public ShortcutSettings Clone()
@@ -437,6 +445,8 @@ internal sealed class ShortcutSettings
             PlayPauseModifiers = PlayPauseModifiers,
             StopKey = StopKey,
             StopModifiers = StopModifiers,
+            LikeTrackKey = LikeTrackKey,
+            LikeTrackModifiers = LikeTrackModifiers,
             ShowOverlayOnMediaKeys = ShowOverlayOnMediaKeys
         };
     }
@@ -487,6 +497,12 @@ internal sealed class ShortcutSettings
     {
         StopKey = binding.VirtualKeyCode;
         StopModifiers = binding.Modifiers;
+    }
+
+    public void ApplyLikeTrack(ShortcutBinding binding)
+    {
+        LikeTrackKey = binding.VirtualKeyCode;
+        LikeTrackModifiers = binding.Modifiers;
     }
 }
 

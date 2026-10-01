@@ -91,6 +91,7 @@ internal enum MediaPlaybackState
 internal enum MediaKeyCommand
 {
     Peek,
+    LikeTrack,
     PreviousTrack,
     NextTrack,
     PlayPause,
@@ -162,6 +163,8 @@ internal sealed record MediaTrackInfo(
     byte[]? ArtworkBytes,
     MediaPlaybackState PlaybackState)
 {
+    public string? SourceAppId { get; init; }
+
     public string DisplayText => string.IsNullOrWhiteSpace(Artist)
         ? Title
         : $"{Artist} - {Title}";

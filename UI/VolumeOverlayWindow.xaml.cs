@@ -18,6 +18,7 @@ public sealed partial class VolumeOverlayWindow : Window
     private const int DefaultHideDelayMs = 1200;
     private const int WsExNoActivate = 0x08000000;
     private const int WsExToolWindow = 0x00000080;
+    private const int WsExTransparent = 0x00000020;
     private const int GwlExStyle = -20;
     private static readonly IntPtr HwndTopMost = new(-1);
     private const uint SwpNoMove = 0x0002;
@@ -33,6 +34,7 @@ public sealed partial class VolumeOverlayWindow : Window
         Interval = TimeSpan.FromMilliseconds(DefaultHideDelayMs)
     };
     private float currentVolume;
+    private int hideDelayMs = DefaultHideDelayMs;
     private string? currentMediaDetail;
     private int currentArtworkFingerprint;
     private int currentArtworkLength;
@@ -52,13 +54,22 @@ public sealed partial class VolumeOverlayWindow : Window
         };
     }
 
+    internal void ShowNotification(string message, string? track, byte[]? artworkBytes = null)
+    {
+        ShowVolume(message, 0, detail: track, artworkBytes: artworkBytes);
+        PercentText.Visibility = Visibility.Collapsed;
+        BarBackground.Visibility = Visibility.Collapsed;
+        hideTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(hideDelayMs, 2500));
+    }
+
     internal void Configure(OverlaySettings settings)
     {
         settings.Normalize();
         Width = settings.Width;
         Height = settings.Height;
         ApplySizePreset(settings.SizePreset);
-        hideTimer.Interval = TimeSpan.FromMilliseconds(settings.DurationMs);
+        hideDelayMs = settings.DurationMs;
+        hideTimer.Interval = TimeSpan.FromMilliseconds(hideDelayMs);
         showArtwork = settings.ShowArtwork;
         overlayPosition = settings.Position;
         overlayTheme = settings.Theme;
@@ -133,7 +144,7 @@ public sealed partial class VolumeOverlayWindow : Window
         base.OnSourceInitialized(e);
         var handle = new WindowInteropHelper(this).Handle;
         var style = GetWindowLong(handle, GwlExStyle);
-        SetWindowLong(handle, GwlExStyle, style | WsExNoActivate | WsExToolWindow);
+        SetWindowLong(handle, GwlExStyle, style | WsExNoActivate | WsExToolWindow | WsExTransparent);
     }
 
     public void ShowVolume(
@@ -144,6 +155,9 @@ public sealed partial class VolumeOverlayWindow : Window
         byte[]? artworkBytes = null,
         bool preserveMedia = false)
     {
+        PercentText.Visibility = Visibility.Visible;
+        BarBackground.Visibility = Visibility.Visible;
+        hideTimer.Interval = TimeSpan.FromMilliseconds(hideDelayMs);
         var clamped = Math.Clamp(volume, 0f, 1f);
         currentVolume = isMuted ? 0 : clamped;
         TargetText.Text = string.IsNullOrWhiteSpace(target) ? "Volume" : target;

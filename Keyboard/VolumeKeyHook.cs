@@ -94,6 +94,14 @@ internal sealed class VolumeKeyHook : IDisposable
                 var modifiers = GetCurrentModifiers();
                 if (TryGetMediaKeyCommand(key.VirtualKeyCode, modifiers, shortcuts, out var mediaCommand) && onMediaKey is not null)
                 {
+                    // Holding the like shortcut must not keep sending requests.
+                    if (mediaCommand == MediaKeyCommand.LikeTrack)
+                    {
+                        lock (blockedKeyUps)
+                        {
+                            if (blockedKeyUps.Contains(key.VirtualKeyCode)) return 1;
+                        }
+                    }
                     var handled = onMediaKey(mediaCommand);
                     if (handled)
                     {
@@ -153,6 +161,12 @@ internal sealed class VolumeKeyHook : IDisposable
         ShortcutSettings shortcuts,
         out MediaKeyCommand command)
     {
+        if (Matches(virtualKeyCode, modifiers, shortcuts.LikeTrack))
+        {
+            command = MediaKeyCommand.LikeTrack;
+            return true;
+        }
+
         if (Matches(virtualKeyCode, modifiers, shortcuts.PeekMedia))
         {
             command = MediaKeyCommand.Peek;

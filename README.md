@@ -48,6 +48,8 @@ a interface, este README e os textos do projeto.
   mudem de posicao no meio da exibicao.
 - Nao usa a API do Spotify; as informacoes de musica vem dos controles de midia
   do Windows.
+- Atalho global para curtir no Spotify desktop, sem chave de API ou token.
+  Aciona a janela em segundo plano sem trocar o foco ou mover o mouse.
 
 ## Download
 
@@ -106,6 +108,28 @@ evitar mostrar a musica anterior.
 
 Esse atalho pode ser alterado na aba `Atalhos`. Se voce escolher `F1`, o `F1`
 comum passa a ser capturado porque essa foi uma escolha explicita.
+
+### Curtir no Spotify sem mudar o foco
+
+Pressione `Ctrl+Alt+L` para adicionar a musica atual do Spotify a Musicas
+Curtidas. O atalho pode ser alterado ou desativado na aba `Atalhos`, em
+`Curtir no Spotify`, e acompanha os perfis. A captura precisa estar ativa.
+Uma musica ja curtida continua curtida; o atalho nao remove curtidas.
+
+Depois da acao, o overlay mostra a confirmacao, a capa e o nome da musica/artista,
+sem botao clicavel nem barra de volume. Se o Spotify nao confirmar a curtida,
+o overlay informa a falha. Segurar a tecla nao repete a acao.
+
+O app le o controle pela acessibilidade do Windows e envia mensagens de clique
+somente para a janela do Spotify. Nao traz o Spotify para frente, nao envia
+atalhos globais e nao move o cursor. A confirmacao aparece no overlay.
+
+Deixe a janela do Spotify aberta atras das outras janelas, sem minimizar.
+Janelas minimizadas nao sao restauradas automaticamente. Esta integracao
+suporta os controles em portugues e ingles e depende da interface do Spotify;
+se os controles estiverem indisponiveis, o overlay informa a falha. Spotify Web
+nao e suportado pelo atalho de curtir. O foco foi verificado em um teste com
+outra janela ativa; jogos em tela cheia exclusiva ainda nao foram verificados.
 
 ## Exemplo: Voicemeeter AUX
 

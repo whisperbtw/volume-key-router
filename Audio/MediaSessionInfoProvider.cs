@@ -37,7 +37,10 @@ internal sealed class MediaSessionInfoProvider
                     title,
                     NullIfWhiteSpace(properties.Artist),
                     artworkBytes,
-                    ToPlaybackState(session.GetPlaybackInfo().PlaybackStatus));
+                    ToPlaybackState(session.GetPlaybackInfo().PlaybackStatus))
+                {
+                    SourceAppId = session.SourceAppUserModelId
+                };
             }
         }
         catch (OperationCanceledException)

@@ -347,6 +347,7 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
 
                         <TextBlock Grid.Row="0" Grid.Column="0" Text="Diminuir volume" VerticalAlignment="Center" Margin="0,0,12,12" />
@@ -377,8 +378,13 @@
                         <Button x:Name="StopShortcutButton" Grid.Row="3" Grid.Column="4" MinWidth="140" Margin="0,0,6,12" Click="ShortcutRecordButton_Click" />
                         <Button x:Name="StopShortcutResetButton" Grid.Row="3" Grid.Column="5" Style="{StaticResource IconButtonStyle}" Content="↺" ToolTip="Restaurar atalho" Margin="0,0,0,12" Click="ShortcutResetButton_Click" />
 
-                        <CheckBox x:Name="ShowMediaKeysOverlayBox" Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="3" Content="Mostrar overlay nas teclas de midia" Checked="ShortcutSetting_Changed" Unchecked="ShortcutSetting_Changed" />
-                        <Button Grid.Row="4" Grid.Column="4" Grid.ColumnSpan="2" Content="Redefinir todos" HorizontalAlignment="Right" Click="ResetShortcutsButton_Click" />
+                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Curtir no Spotify" VerticalAlignment="Center" Margin="0,0,12,12" />
+                        <Button x:Name="LikeShortcutButton" Grid.Row="4" Grid.Column="1" MinWidth="140" Margin="0,0,6,12" Click="ShortcutRecordButton_Click" />
+                        <Button x:Name="LikeShortcutResetButton" Grid.Row="4" Grid.Column="2" Style="{StaticResource IconButtonStyle}" Content="↺" ToolTip="Restaurar atalho" Margin="0,0,18,12" Click="ShortcutResetButton_Click" />
+                        <TextBlock Grid.Row="4" Grid.Column="3" Grid.ColumnSpan="3" Text="Confirma a curtida no overlay sem trocar o foco." TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,0,12" Foreground="{StaticResource MutedBrush}" />
+
+                        <CheckBox x:Name="ShowMediaKeysOverlayBox" Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="3" Content="Mostrar overlay nas teclas de midia" Checked="ShortcutSetting_Changed" Unchecked="ShortcutSetting_Changed" />
+                        <Button Grid.Row="5" Grid.Column="4" Grid.ColumnSpan="2" Content="Redefinir todos" HorizontalAlignment="Right" Click="ResetShortcutsButton_Click" />
                     </Grid>
                 </Border>
             </TabItem>

@@ -42,6 +42,8 @@ public sealed partial class MainWindow : Window
     private readonly AppSettings settings;
     private readonly AudioManager audioManager = new();
     private readonly MediaSessionInfoProvider mediaSessionInfoProvider = new();
+    private readonly SpotifyLikeController spotifyLikeController = new();
+    private int likingTrack;
     private readonly object targetGate = new();
     private readonly object applyGate = new();
     private readonly object mediaCacheGate = new();
@@ -360,6 +362,7 @@ public sealed partial class MainWindow : Window
         SetShortcutButton(NextShortcutButton, settings.Shortcuts.NextTrack);
         SetShortcutButton(PlayPauseShortcutButton, settings.Shortcuts.PlayPause);
         SetShortcutButton(StopShortcutButton, settings.Shortcuts.Stop);
+        SetShortcutButton(LikeShortcutButton, settings.Shortcuts.LikeTrack);
         ShowMediaKeysOverlayBox.IsChecked = settings.Shortcuts.ShowOverlayOnMediaKeys;
     }
 
@@ -408,6 +411,7 @@ public sealed partial class MainWindow : Window
         settings.Shortcuts.ApplyStop(GetSelectedShortcut(
             StopShortcutButton,
             KeyboardShortcutKeys.MediaStop));
+        settings.Shortcuts.ApplyLikeTrack(GetSelectedShortcut(LikeShortcutButton, 0x4C));
         settings.Shortcuts.ShowOverlayOnMediaKeys = ShowMediaKeysOverlayBox.IsChecked == true;
         settings.Shortcuts.Normalize();
         UpdateShortcutSnapshot();
@@ -491,6 +495,7 @@ public sealed partial class MainWindow : Window
         yield return NextShortcutButton;
         yield return PlayPauseShortcutButton;
         yield return StopShortcutButton;
+        yield return LikeShortcutButton;
     }
 
     private string? GetShortcutConflictText()
@@ -563,6 +568,7 @@ public sealed partial class MainWindow : Window
             "NextShortcutButton" => "Proxima midia",
             "PlayPauseShortcutButton" => "Play/Pause",
             "StopShortcutButton" => "Parar midia",
+            "LikeShortcutButton" => "Curtir no Spotify",
             _ => "outro atalho"
         };
     }
@@ -980,6 +986,12 @@ public sealed partial class MainWindow : Window
             return false;
         }
 
+        if (command == MediaKeyCommand.LikeTrack)
+        {
+            _ = LikeCurrentSpotifyTrackAsync();
+            return true;
+        }
+
         SendMediaKeyToWindows(command);
         if (command == MediaKeyCommand.Peek || GetShortcutSettings().ShowOverlayOnMediaKeys)
         {
@@ -987,6 +999,32 @@ public sealed partial class MainWindow : Window
         }
 
         return true;
+    }
+
+    private async Task LikeCurrentSpotifyTrackAsync()
+    {
+        if (Interlocked.CompareExchange(ref likingTrack, 1, 0) != 0) return;
+        try
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            var track = await mediaSessionInfoProvider.GetCurrentTrackAsync("Spotify", timeout.Token, includeArtwork: true);
+            if (track?.SourceAppId?.Contains("spotify", StringComparison.OrdinalIgnoreCase) != true) track = null;
+            if (track is not null) track = ReuseCachedArtwork(track);
+            var result = track is not null
+                ? await spotifyLikeController.LikeAsync(track.Title)
+                : new SpotifyLikeResult(false, "Nenhuma música do Spotify disponível.");
+
+            BeginInvokeSafe(() =>
+            {
+                Interlocked.Increment(ref overlayRequestId);
+                SetStatus(result.Message);
+                volumeOverlay.ShowNotification(result.Message, track?.DisplayText, track?.ArtworkBytes);
+            });
+        }
+        finally
+        {
+            Interlocked.Exchange(ref likingTrack, 0);
+        }
     }
 
     private static void SendMediaKeyToWindows(MediaKeyCommand command)
@@ -2122,6 +2160,9 @@ public sealed partial class MainWindow : Window
             nameof(StopShortcutResetButton) => (
                 StopShortcutButton,
                 new ShortcutBinding(KeyboardShortcutKeys.MediaStop, ShortcutModifiers.None)),
+            nameof(LikeShortcutResetButton) => (
+                LikeShortcutButton,
+                new ShortcutSettings().LikeTrack),
             _ => null
         };
     }
